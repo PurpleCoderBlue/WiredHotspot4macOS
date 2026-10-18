@@ -1,170 +1,87 @@
-# HoRNDIS Userspace
+# 有线热点4macOS
 
-<p align="center">
-  <a href="README.md">English</a> |
-  <a href="README.zh-CN.md">简体中文</a>
-</p>
+**Wired Hotspot 4 macOS**
 
-HoRNDIS runs the Android USB tethering data path in user space rather than the kernel, so it works on modern macOS without disabling System Integrity Protection (SIP).
+[简体中文](README.md) · [English](README.en.md)
 
-[User guide](docs/USER_GUIDE.md) · [Report a bug](docs/BUG_REPORTING.md) · [Privilege model](docs/PRIVILEGE_MODEL.md) · [Known limitations](docs/LIMITATIONS.md) · [Menu UI contract](docs/MENU_UI_GUIDELINES.md)
+面向 macOS 的 Android USB 网络共享工具，基于 [HoRNDIS Userspace](https://github.com/noahhhi/HoRNDIS-Userspace) 维护。本分支默认使用简体中文，补充了权限边界、USB 传输、连接失败回滚和断开清理的修复及回归测试。
 
-> **Preview:** RNDIS is implemented and tested with a Pixel 4 XL. CDC-ECM and CDC-NCM devices are detected so future transports can be added without replacing the macOS network backend.
+**当前版本：0.1.0，本项目从此独立编号，不跟随上游版本。仅实现 RNDIS，不提供 ECM/NCM 传输。**
 
-Current reference test: Apple Silicon Mac running macOS 27.0, Pixel 4 XL running Android 13, RNDIS interfaces 0/1 alongside ADB interface 2. USB initialization, DHCP, ARP, aggregated RNDIS frames, ICMP, and bidirectional TCP payloads are covered by local or device tests.
+[用户手册](docs/USER_GUIDE.zh-CN.md) · [反馈问题](docs/BUG_REPORTING.zh-CN.md) · [权限模型](docs/PRIVILEGE_MODEL.md) · [限制与真机验收](docs/LIMITATIONS.md)
 
-## Install
+## 下载安装
 
-### Homebrew
+1. 从 [本仓库 Releases](https://github.com/PurpleCoderBlue/WiredHotspot4macOS/releases/latest) 下载 `WiredHotspot4macOS-v0.1.0-macos-universal.pkg`。
+2. 可用同页的 `SHA256SUMS` 核对文件：`shasum -a 256 -c SHA256SUMS`。
+3. 打开 PKG，按提示完成管理员认证。
+4. 连接 Android 手机，在手机上开启“USB 网络共享”。
 
-```sh
-brew install --cask noahhhi/tap/horndis
-```
+安装包包含 Apple Silicon 和 Intel 两种架构。命令仍为 `horndis`，菜单栏 App 仍安装到 `/Applications/HoRNDIS Status.app`；沿用原有服务标识，便于升级已有安装。0.1.0 起独立编号；明确运行安装包时会替换原 App，即使已有上游版本号更高。
 
-### Package installer
+> 安装包未使用 Developer ID 签名或公证，内置程序使用本地 ad-hoc 签名。如果 macOS 阻止打开，请确认下载来源后，在“系统设置 → 隐私与安全性”中使用“仍要打开”。无需关闭 SIP 或降低启动安全性。
 
-1. Download the universal `.pkg` from [GitHub Releases](https://github.com/noahhhi/HoRNDIS-Userspace/releases).
-2. Try to open the downloaded `.pkg`.
-3. If macOS blocks it, open **System Settings → Privacy & Security**.
-4. Click **Open Anyway** for the HoRNDIS package.
-5. Enter an administrator password when prompted, then complete the installation.
+上游 Homebrew tap 安装的是上游版本；要使用本分支的修复，请下载本仓库的安装包。
 
-> [!IMPORTANT]
-> This project currently uses a free Apple Developer account, which cannot provide the paid Developer ID certificate required to sign and notarize the installer for public distribution. macOS may therefore block the first launch until you approve it with **Open Anyway**. You do not need to disable SIP or reduce system security.
+## 使用与语言
 
-The installer recreates `/Library/PrivilegedHelperTools` with the standard
-root-owned permissions if that system directory is missing; no manual directory
-preparation is required.
+菜单栏可暂停/恢复共享、设置登录时启动、查看连接信息和流量、保存诊断报告。退出菜单栏 App 不会停止后台网络服务。
 
-Enable **USB tethering** on Android, then verify:
+**App 默认使用简体中文，不修改系统语言设置。** 如需其他语言，可在“系统设置 → 通用 → 语言与地区 → 应用程序”中为有线热点4macOS明确选择语言，然后重新打开 App。保留英语、繁体中文、日语、韩语、法语、德语、西班牙语、巴西葡萄牙语、意大利语及俄语资源。
 
 ```sh
-horndis probe
-horndis status
-curl https://ifconfig.me
+horndis probe                 # 查看 USB 网络功能
+horndis status                # 查看服务与连接状态
+horndis diagnostics report.txt # 生成脱敏诊断报告
+horndis start                 # 打开菜单栏 App
+horndis uninstall             # 卸载持久服务和菜单栏启动项
 ```
 
-The launch daemon waits when no phone is connected and reconnects automatically after USB hot-plug or tethering mode changes. Its log is `/var/log/horndis.log`.
+服务日志：`/var/log/horndis.log`。安装、升级和卸载需要管理员认证，日常菜单操作不需要。
 
-The native menu keeps its summary to three rows: connection state, Android device plus duration, and session TX/RX totals. Authorization stays out of the normal summary and appears only when installation or repair is required. **USB Tethering** and **Launch at Login** use the system checkmark without a second leading icon; **Details** uses its native submenu arrow, and Quit uses its keyboard shortcut. If the privileged service is missing, an **Authorize and Install…** row invokes the standard macOS administrator authentication dialog for the fixed bundled installer command. Visible values refresh every second. Open the native **Details** side submenu for the IP address, interface, device MAC, service PID, service log, a privacy-preserving diagnostic-report generator, and the required-log bug-report flow. Normal checked commands talk only to a local Unix socket and never ask for an administrator password. The UI uses AppKit `NSStatusItem`, `NSMenu`, `NSMenuItem.state`, native submenus, SF Symbols, and system-owned geometry/dynamic colors on macOS 11 and later; its implementation and visual acceptance rules are documented in the [menu UI contract](docs/MENU_UI_GUIDELINES.md).
+手机是否自动开启 USB 网络共享由手机系统决定。本程序不使用 ADB，也不自动打开手机热点。
 
-The menu bar app follows the macOS system or per-app language setting through standard bundle localization. It includes English, Simplified Chinese, Traditional Chinese, Japanese, Korean, French, German, Spanish, Brazilian Portuguese, Italian, and Russian. On supported macOS releases, choose a different language for **HoRNDIS Status** in **System Settings → General → Language & Region → Applications**, then reopen the app.
+## 本分支的修复
 
-The traffic row uses its leading SF Symbol as the upload arrow, then places the transmitted total and explicit `↓` received marker in the title. This removes the duplicated upload symbol and shifts the remaining traffic content left without changing other rows.
+- USB/RNDIS 数据进程永久降权；限制继承的 BPF 描述符重新绑定，并在控制台用户切换时撤销旧会话。
+- root 状态文件使用独立目录及基于文件描述符的发布操作，避免用户目录中的符号链接引导特权写入。
+- 本地控制 socket 支持分段命令，并限制客户端数量和等待时间。
+- 修复 RNDIS USB 短包补零、收发容量混用、异步状态消息和复合 USB 设备接口配对。
+- DHCP 启动失败时回滚自建网络；断开清理有界重试，修复“已提交但未应用”之后重试误报成功的问题。
+- 先取消 USB 写入并请求撤网，再等待工作线程；队列等待和 supervisor 请求增加截止时间，延迟回调保留独立生命周期。
 
-To remove it:
+只管理本程序创建的 bridge/feth 网络，不修改 Wi-Fi、系统代理、Clash 或网络服务优先级。网络偏好由 macOS `configd` 应用，仍有系统依赖；详细边界见[权限模型](docs/PRIVILEGE_MODEL.md)。
 
-```sh
-horndis uninstall
-brew uninstall --cask horndis
-brew untap noahhhi/tap
-```
+## 验证范围与代理兼容
 
-Universal manual ZIP archives are also attached to GitHub Releases for advanced use.
+本地完整回归包含 21 个测试程序，覆盖协议、USB 替身、网络故障注入、控制通道、状态文件、权限限制及菜单规则；USB 回归还运行了 ASan/UBSan。测试不等于全部设备验收。
 
-## Why this exists
+本地荣耀 500 Pro（RNDIS）已验证 DHCP 和绑定 USB 接口的真实 IP HTTPS 访问。睡眠唤醒、长时间高负载、更多手机/macOS 组合及实际用户切换仍需真机验证。上游报告的 Pixel 4 XL 测试记录不等于本分支重新执行过同一套验收。
 
-The original [HoRNDIS](https://github.com/jwise/HoRNDIS) is a kernel extension. Current macOS releases require reduced security or disabled SIP to load legacy, unnotarized kernel code. HoRNDIS Userspace instead keeps the RNDIS data path outside the kernel, so it can run on modern macOS without reducing boot security or disabling SIP.
+若启用了 Clash/Mihomo TUN，仅看到系统默认路由切换不能证明代理已切换出口。本地曾复现：仅 USB 时直连 HTTPS 成功，但 Mihomo 仍选择已断开的 Wi-Fi 接口，TUN 和代理请求超时。本程序不自动更改代理设置；排查时应分别检查 USB 直连和代理出口。
 
-HoRNDIS Userspace uses APIs already shipped by macOS:
+## 源码编译
 
-```text
-Android RNDIS control + bulk endpoints
-             ↕
-        IOUSBHost.framework
-             ↕
-     user-space RNDIS transport
-             ↕
-       BPF ↔ feth peer pair
-             ↕
- SystemConfiguration / DHCP adapter
-             ↕
-       macOS TCP/IP stack
-
-unprivileged data agent
-             ↕
-  read-only status + local control socket
-             ↕
-      AppKit menu bar status
-```
-
-- `IOUSBHost` claims only the RNDIS control and data interfaces. ADB stays on its separate USB interface.
-- A paired `feth` device gives macOS a normal Ethernet interface while BPF exchanges raw frames with the daemon. HoRNDIS exclusively creates an unused pair, preferring `feth99`/`feth98` and scanning downward if another application already owns either name.
-- The network adapter first uses public `SystemConfiguration`. Current macOS does not expose dynamically cloned feth devices there, so it falls back to the system `ipconfig` DHCP client and recreates that temporary service on every connection.
-- The RNDIS implementation runs in user space rather than as a kernel extension, so no recovery-mode change or SIP change is required.
-- A small root supervisor performs only the operations macOS reserves for root: create/configure feth, start DHCP, and open one BPF descriptor. It passes that already-open descriptor plus a fixed DHCP-refresh request channel to a permanently unprivileged child running as the current console user; the channel carries no packet data or command arguments.
-- USB discovery, RNDIS parsing, packet forwarding, runtime status, and menu control all execute in that unprivileged data agent. The root supervisor does not parse device-controlled traffic.
-- The optional menu bar process is also unprivileged and isolated from the data path. Quitting it cannot disconnect the USB network.
-
-Administrator authorization is required only to install, upgrade, or remove the root-owned LaunchDaemon. It can be requested with `horndis install` in a terminal or from **Authorize and Install…** in the menu bar. At each boot the privileged setup lasts only long enough to create the network capability; reboot, login, sleep/wake, USB reconnect, and normal menu use require no further authorization. See the [privilege model](docs/PRIVILEGE_MODEL.md).
-
-## Commands
-
-```text
-horndis install               authorize once and install/start both components
-horndis uninstall             remove both persistent components
-horndis start|stop|restart    control only the menu bar app
-horndis status                show network, connection, and menu status
-horndis diagnostics [FILE]    create a privacy-preserving diagnostic report
-horndis probe                 list RNDIS/CDC USB networking functions
-horndis usb-test              initialize RNDIS without creating a network interface
-sudo horndis run              run in the foreground
-sudo horndis service install  install and start the launch daemon
-sudo horndis service uninstall
-horndis --version
-horndis help [command]
-man horndis
-```
-
-The bridge automatically selects two absent `feth<number>` names, preferring `feth99` for macOS and `feth98` for the daemon, then `feth97`/`feth96`, and so on. It never adopts an existing interface. Root launch environments can override the pair with `HORNDIS_HOST_INTERFACE` and `HORNDIS_TRANSPORT_INTERFACE`; both variables must be set together to distinct names that do not already exist. `horndis status` and menu Details show the selected macOS-facing interface.
-
-## Development
-
-Requirements: macOS 11 or later, Xcode Command Line Tools or Xcode, and GNU Make. macOS 11–14 and Intel builds are best-effort compatibility targets; the current hardware validation is listed at the top of this document.
-
-End-user Homebrew and Release installations use the prebuilt universal `.pkg`; the following commands are only for developing or testing the project from source.
+需要 macOS、Xcode 或 Command Line Tools 和 Make。二进制最低目标为 macOS 11；旧系统和 Intel 的实际兼容性仍以真机结果为准。
 
 ```sh
 make
-make test
-./build/horndis probe
-./build/horndis usb-test
-sudo ./build/horndis run
+make test                    # 以普通用户运行，不安装服务或修改系统网络
 ```
 
-To build a universal release binary with a recent Xcode:
+也可打开 `WiredHotspot4macOS.xcodeproj`，选择 **WiredHotspot4macOS → Build**。**Regression Tests → Build** 调用 Makefile 测试，不使用 XCTest。输出按配置和架构分离，位于 `build/xcode/`。
+
+构建通用安装包：
 
 ```sh
-make clean
-make ARCH_FLAGS="-arch arm64 -arch x86_64" STATUS_ARCHS="arm64 x86_64"
+make all BUILD_DIR=build/release ARCH_FLAGS='-arch arm64 -arch x86_64' STATUS_ARCHS='arm64 x86_64'
+BUILD_DIR="$PWD/build/release" Scripts/build-package 0.1.0 build/WiredHotspot4macOS-v0.1.0-macos-universal.pkg
 ```
 
-## Compatibility and long-term design
+打包会移除本机调试路径及 AppleDouble 元数据并重新校验签名。可用 `python3 Tests/PackageContentsTests.py <安装包.pkg>` 检查版本、架构、所有权及包内容，无需安装。
 
-The project deliberately separates four concerns: USB discovery, network protocol framing, the macOS Ethernet backend, and service installation. RNDIS framing has portable unit tests; USB access is isolated in `USBTransport.mm`; the feth/BPF backend is isolated in `VirtualEthernet.cpp`.
+构建和测试不会安装服务；从源码安装需另行显式运行安装命令。
 
-That boundary makes the likely future paths incremental:
+## 来源与许可证
 
-1. Add CDC-NCM and CDC-ECM transports while retaining the same Ethernet backend.
-2. Add a `utun` layer-3 backend if Apple ever removes the feth cloner; ARP/DHCP adaptation would live only in that backend.
-3. Replace the current feth DHCP compatibility path with the `utun` backend or a small built-in DHCP adapter.
-4. Add an optional libusb transport if IOUSBHost behavior diverges on a future macOS release.
-
-RNDIS currently supports Android gadget layouts `e0/01/03`, `02/02/ff`, and `ef/04/01`, paired with a CDC data interface. Reports for other Android vendors are welcome.
-
-## Troubleshooting
-
-Before opening a bug, reproduce it and create a fresh report with **HoRNDIS → Details → Save Diagnostic Report…** or `horndis diagnostics FILE`. The GitHub bug form requires that report as a `.txt`, `.log`, or `.zip` upload, and blank external issues are disabled. See [Reporting a bug](docs/BUG_REPORTING.md).
-
-- `cannot claim ... interface`: stop another RNDIS driver or application that owns interfaces 0/1. ADB on interface 2 is compatible.
-- Menu stuck at **Configuring DHCP** after the device appears: current builds automatically raise the selected feth interface and restart DHCP on every connection. With an older build, run `sudo ifconfig feth99 up` followed by `sudo ipconfig set feth99 DHCP`, toggle Android USB tethering off/on, then upgrade or reinstall HoRNDIS for the permanent fix. If a current build still fails, use the interface printed by `horndis status` with `ipconfig getsummary <interface>` and inspect `/var/log/horndis.log` for the explicit DHCP-refresh error.
-- Another application already uses `feth98` or `feth99`: current builds skip the occupied pair automatically and report the selected interface in status/Details. HoRNDIS never reconfigures or removes the pre-existing interfaces.
-- `cannot copy the privileged helper: No such file or directory`: upgrade to v0.3.8 or later and retry. Current installers securely recreate a missing `/Library/PrivilegedHelperTools` directory before copying the helper.
-- The Homebrew Cask and release `.pkg` update the privileged helper and menu LaunchAgent as part of package installation; no local compiler is used.
-- To keep Wi-Fi active while testing the phone path, bind the socket with `ping -b <interface> 8.8.8.8`, replacing `<interface>` with the value printed by `horndis status`.
-- Android VPN apps normally do not share their tunnel through native USB tethering. If the phone's underlying Wi-Fi cannot access a destination without its VPN, that destination will also be unavailable to the Mac.
-- On rooted Android builds where DHCP and ICMP work but TCP stalls, inspect `dumpsys tethering` for conntrack/BPF errors. The Android BPF offload can be disabled for diagnosis with `device_config put connectivity override_tether_enable_bpf_offload false`; delete that property to restore the device default.
-
-## License
-
-GPL-3.0-or-later, matching the original HoRNDIS project. See `LICENSE`.
+基于 [noahhhi/HoRNDIS-Userspace](https://github.com/noahhhi/HoRNDIS-Userspace)，保留原作者及贡献者版权和 [GPL-3.0-or-later 许可证](LICENSE)。这是独立维护分支，不代表上游官方发布。

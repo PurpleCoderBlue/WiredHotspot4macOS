@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
     assert(refresh < connected);
 
     require(mainSource, "success = ethernet.refreshDHCP(error)");
-    require(mainSource, "superviseAgentDHCP(supervisorDescriptor, ethernet)");
+    require(mainSource, "superviseAgentDHCP(supervisorDescriptor, ethernet, identity.value())");
 
     // The connected session must probe IPv4 liveness and repair a stripped
     // address through the supervisor channel, with a grace period so the
@@ -48,6 +48,18 @@ int main(int argc, char* argv[]) {
         mainSource, "if (!horndis::requestDHCPRefresh(supervisorDescriptor, repairError))");
     assert(probe < repair);
     require(mainSource, "lastDhcpRepair >= kAddressGracePeriod");
+
+    // Integration wiring: cancellation and network revocation must precede
+    // joining the worker; cleanup failure must precede the waiting status path.
+    const size_t cancel = require(mainSource, "usb.cancelWrites()");
+    const size_t suspend = mainSource.find("requestNetworkSuspend(supervisorDescriptor", cancel);
+    const size_t joined = mainSource.find("outbound.join()", cancel);
+    const size_t cleanupFailure = mainSource.find("if (!suspended)", joined);
+    const size_t waiting = mainSource.find("runtimeStatus.state = userPaused", joined);
+    assert(cancel < suspend && suspend < joined && joined < cleanupFailure && cleanupFailure < waiting);
+    const auto failedStart = mainSource.substr(refresh, connected-refresh);
+    require(failedStart, "return 1;");
+    assert(failedStart.find("runtimeStatus.state = \"waiting\"") == std::string::npos);
 
     require(ethernetSource,
             "configureInterface(hostInterface_, {\"mtu\", \"1500\", \"up\"}, error)");

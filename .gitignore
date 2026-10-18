@@ -3,6 +3,8 @@
 /.DS_Store
 **/.DS_Store
 *.xcuserstate
+**/xcuserdata/
+/build-universal-review/
 
 # Local coding-agent state is never a release input.
 AGENT.md

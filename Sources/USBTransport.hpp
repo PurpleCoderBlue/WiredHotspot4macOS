@@ -22,6 +22,7 @@ struct USBDeviceInfo {
     uint16_t productId = 0;
     uint8_t controlInterfaceNumber = 0;
     uint8_t dataInterfaceNumber = 0;
+    bool dataInterfaceKnown = false;
     std::string product;
     std::string serial;
     bool supported = false;
@@ -40,6 +41,8 @@ public:
     bool initialize(std::vector<uint8_t>& deviceAddress, std::string& error);
     bool readEthernetFrame(std::vector<uint8_t>& frame, bool& timedOut, std::string& error);
     bool writeEthernetFrame(const std::vector<uint8_t>& frame, std::string& error);
+    // Wake a writer waiting for USB queue capacity. Call before joining it.
+    void cancelWrites();
     void close();
 
 private:
@@ -47,6 +50,7 @@ private:
     std::unique_ptr<Impl> impl_;
     uint32_t nextRequestId_ = 1;
     uint32_t maxTransferSize_ = 16384;
+    uint32_t maxTransmitSize_ = 16384;
     std::deque<std::vector<uint8_t>> pendingFrames_;
 
     bool exchangeControl(const std::vector<uint8_t>& request,

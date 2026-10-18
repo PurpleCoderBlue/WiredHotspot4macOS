@@ -36,8 +36,8 @@ int main(int argc, char* argv[]) {
     require(ethernetSource, "{transportInterface_, \"destroy\"}");
     require(mainSource,
             "HORNDIS_HOST_INTERFACE and HORNDIS_TRANSPORT_INTERFACE must be set together");
-    require(mainSource, "const std::string hostInterface = ethernet.hostInterface()");
-    require(mainSource, "const std::string transportInterface = ethernet.transportInterface()");
+    require(mainSource, "std::string hostInterface = ethernet.hostInterface()");
+    require(mainSource, "std::string transportInterface = ethernet.transportInterface()");
     assert(statusSource.find("ipv4Address(for: \"feth99\")") == std::string::npos);
 
     std::cout << "Interface lifecycle source contract passed\n";

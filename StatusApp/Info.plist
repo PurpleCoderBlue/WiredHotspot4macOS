@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
   <key>CFBundleDevelopmentRegion</key>
-  <string>en</string>
+  <string>zh-Hans</string>
   <key>CFBundleDisplayName</key>
-  <string>HoRNDIS Status</string>
+  <string>有线热点4macOS</string>
   <key>CFBundleExecutable</key>
   <string>horndis-status</string>
   <key>CFBundleIdentifier</key>
@@ -15,13 +15,13 @@
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
-  <string>HoRNDIS Status</string>
+  <string>有线热点4macOS</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.3.10</string>
+  <string>0.1.0</string>
   <key>CFBundleVersion</key>
-  <string>21</string>
+  <string>22</string>
   <key>LSMinimumSystemVersion</key>
   <string>11.0</string>
   <key>LSUIElement</key>

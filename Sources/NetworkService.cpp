@@ -76,7 +76,7 @@ bool configure(bool removing, std::string& name, std::string& error) {
     }
     auto prefs = SCPreferencesCreate(nullptr, CFSTR("HoRNDIS Userspace"), nullptr);
     if (!prefs) { error = "cannot open system network preferences"; return false; }
-    if (!SCPreferencesLock(prefs, true)) {
+    if (!SCPreferencesLock(prefs, false)) {
         CFRelease(prefs); error = "cannot lock system network preferences"; return false;
     }
     SCNetworkInterfaceRef bridge = nullptr;
@@ -200,7 +200,7 @@ bool setNetworkServiceMember(const std::string& bridgeName, const std::string& m
     }
     auto prefs = SCPreferencesCreate(nullptr, CFSTR("HoRNDIS Userspace"), nullptr);
     if (!prefs) { error = "cannot open network preferences"; return false; }
-    if (!SCPreferencesLock(prefs, true)) { CFRelease(prefs); error = "cannot lock network preferences"; return false; }
+    if (!SCPreferencesLock(prefs, false)) { CFRelease(prefs); error = "cannot lock network preferences"; return false; }
     auto path = CFStringCreateWithFormat(nullptr, nullptr, CFSTR("/VirtualNetworkInterfaces/Bridge/%s"), bridgeName.c_str());
     auto name = CFStringCreateWithCString(nullptr, member.c_str(), kCFStringEncodingUTF8);
     auto configuration = SCPreferencesPathGetValue(prefs, path);
@@ -212,8 +212,13 @@ bool setNetworkServiceMember(const std::string& bridgeName, const std::string& m
         const auto count = CFArrayGetCount(current);
         // Never replace someone else's configured members, even on our bridge.
         if (count > 1 || (count == 1 && !CFEqual(CFArrayGetValueAtIndex(current, 0), name))) break;
-        if (count == (attached ? 1 : 0)) { ok = true; break; }
         if (!safeMemberApply(prefs) || (attached && !if_nametoindex(member.c_str()))) break;
+        if (count == (attached ? 1 : 0)) {
+            // A previous commit may have succeeded while apply failed. Stored
+            // equality alone cannot acknowledge completion to the supervisor.
+            ok = SCPreferencesApplyChanges(prefs);
+            break;
+        }
         auto updated = CFDictionaryCreateMutableCopy(nullptr, 0, configuration);
         const void* values[] = {name};
         auto members = CFArrayCreate(nullptr, values, attached ? 1 : 0, &kCFTypeArrayCallBacks);

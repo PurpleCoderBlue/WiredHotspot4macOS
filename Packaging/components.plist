@@ -7,8 +7,10 @@
     <true/>
     <key>BundleIsRelocatable</key>
     <false/>
+    <!-- Independent fork versions may be lower than upstream. An explicit
+         installer run must replace the app instead of silently retaining it. -->
     <key>BundleIsVersionChecked</key>
-    <true/>
+    <false/>
     <key>BundleOverwriteAction</key>
     <string>upgrade</string>
     <key>RootRelativeBundlePath</key>

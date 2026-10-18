@@ -5,6 +5,9 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <utility>
+#include <sys/types.h>
+#include <vector>
 
 namespace horndis {
 
@@ -48,15 +51,27 @@ class RuntimeStatusPublisher {
 public:
     explicit RuntimeStatusPublisher(
         std::chrono::steady_clock::duration periodicInterval =
-            std::chrono::seconds(5));
+            std::chrono::seconds(5),
+        std::string directory = "/var/run/horndis");
 
-    bool publish(const RuntimeStatus& status, std::string& error, bool force = false);
+    bool publish(const RuntimeStatus& status, std::string& error, bool force = false,
+                 std::optional<std::pair<uid_t, gid_t>> owner = std::nullopt);
 
 private:
     RuntimeStatusPublicationPolicy policy_;
+    std::string directory_;
+    std::optional<std::pair<uid_t, gid_t>> lastOwner_;
 };
 
 bool publishRuntimeStatus(const RuntimeStatus& status, std::string& error);
+bool publishRuntimeStatusInDirectory(const RuntimeStatus& status,
+                                    const std::string& directory,
+                                    std::string& error,
+                                    std::optional<std::pair<uid_t, gid_t>> owner = std::nullopt);
+bool prepareUserRuntimeDirectory(const std::string& directory, uid_t user, gid_t group,
+                                 std::string& error);
+std::string readLatestRuntimeStatus(const std::vector<std::string>& directories =
+    {"/var/run/horndis", "/var/run/horndis-supervisor"});
 void removeRuntimeStatus();
 
 // Exposed for tests: the exact JSON document published to status.json.

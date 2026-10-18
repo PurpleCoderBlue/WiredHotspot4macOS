@@ -3,6 +3,7 @@
 
 #include "Diagnostics.hpp"
 #include "USBTransport.hpp"
+#include "RuntimeStatus.hpp"
 
 #include <algorithm>
 #include <cerrno>
@@ -45,9 +46,17 @@ std::string redactLine(const std::string& line) {
     const std::string lower = lowercased(line);
     const size_t legacyConnection = lower.find("horndis: connected ");
     if (legacyConnection != std::string::npos) {
-        const size_t interface = lower.find(" to feth", legacyConnection);
+        const std::string connection = line.substr(legacyConnection + std::strlen("horndis: connected "));
+        static const std::regex anonymousConnection(R"(^device [1-9][0-9]* to (feth|bridge)[0-9]+$)");
+        if (std::regex_match(connection, anonymousConnection)) {
+            return line;
+        }
+        const size_t interface = lower.rfind(" to ");
+        static const std::regex safeInterface(R"(^ to (feth|bridge)[0-9]+$)");
         return line.substr(0, legacyConnection) + "horndis: connected device 1" +
-            (interface == std::string::npos ? "" : line.substr(interface));
+            (interface == std::string::npos ||
+                     !std::regex_match(line.substr(interface), safeInterface)
+                 ? "" : line.substr(interface));
     }
     if (lower.find("started unprivileged data agent as uid ") != std::string::npos) {
         static const std::regex uid(R"( as uid [0-9]+)");
@@ -277,7 +286,8 @@ std::string utcTimestamp() {
 }
 
 NSDictionary* runtimeStatusObject() {
-    NSData* data = [NSData dataWithContentsOfFile:@"/var/run/horndis/status.json"];
+    const auto snapshot = horndis::readLatestRuntimeStatus();
+    NSData* data = snapshot.empty() ? nil : [NSData dataWithBytes:snapshot.data() length:snapshot.size()];
     if (data == nil) {
         return nil;
     }
@@ -331,7 +341,7 @@ std::string usbSummary() {
                << " vid=0x" << std::hex << std::setfill('0') << std::setw(4) << device.vendorId
                << " pid=0x" << std::setw(4) << device.productId
                << std::dec << " interfaces=" << static_cast<unsigned>(device.controlInterfaceNumber)
-               << '/' << static_cast<unsigned>(device.dataInterfaceNumber)
+               << '/' << (device.dataInterfaceKnown ? std::to_string(device.dataInterfaceNumber) : "?")
                << (device.supported ? " supported" : " backend-pending") << '\n';
     }
     return redact(output.str());

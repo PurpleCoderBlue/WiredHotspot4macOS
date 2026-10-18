@@ -31,7 +31,8 @@ namespace {
 bool runCommand(const char* executable,
                 const std::vector<std::string>& arguments,
                 bool allowFailure,
-                std::string& error) {
+                std::string& error,
+                std::chrono::milliseconds timeout = std::chrono::seconds(3)) {
     std::vector<char*> argv;
     argv.reserve(arguments.size() + 2);
     argv.push_back(const_cast<char*>(executable));
@@ -47,11 +48,22 @@ bool runCommand(const char* executable,
         return false;
     }
     int status = 0;
-    while (waitpid(child, &status, 0) < 0) {
-        if (errno != EINTR) {
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    for (;;) {
+        const pid_t result = waitpid(child, &status, WNOHANG);
+        if (result == child) break;
+        if (result < 0 && errno != EINTR) {
             error = std::string("cannot wait for ") + executable + ": " + std::strerror(errno);
             return false;
         }
+        if (std::chrono::steady_clock::now() >= deadline) {
+            (void)kill(child, SIGKILL);
+            // Reap only the child we created; no unrelated process is touched.
+            while (waitpid(child, &status, 0) < 0 && errno == EINTR) {}
+            error = std::string(executable) + " timed out";
+            return false;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
         if (allowFailure) {
@@ -289,21 +301,27 @@ bool VirtualEthernet::refreshDHCP(std::string& error) {
         error = "the Ethernet bridge is not open";
         return false;
     }
-    if (!memberInterface_.empty() && !memberAttached_) {
-        if (!setNetworkServiceMember(hostInterface_, memberInterface_, true, error)) return false;
-        if (!configureInterface(hostInterface_, {"addm", memberInterface_}, error)) return false;
-        memberAttached_ = true;
-    }
-    if (!memberInterface_.empty() &&
-        !configureInterface(memberInterface_, {"mtu", "1500", "up"}, error)) return false;
-    if (!configureInterface(hostInterface_, {"mtu", "1500", "up"}, error) ||
-        !configureInterface(transportInterface_, {"mtu", "1500", "up"}, error)) {
-        return false;
-    }
-    // ipconfig set creates a temporary DHCP-bridgeN service, hiding the lease
-    // from the registered service's UUID and hence from Network Settings.
-    if (!memberInterface_.empty()) return refreshNetworkService(hostInterface_, error);
-    return runCommand("/usr/sbin/ipconfig", {"set", hostInterface_, "DHCP"}, false, error);
+    const auto activate = [&] {
+        if (!memberInterface_.empty() && !memberAttached_) {
+            if (!setNetworkServiceMember(hostInterface_, memberInterface_, true, error)) return false;
+            if (!configureInterface(hostInterface_, {"addm", memberInterface_}, error)) return false;
+            memberAttached_ = true;
+        }
+        if (!memberInterface_.empty() &&
+            !configureInterface(memberInterface_, {"mtu", "1500", "up"}, error)) return false;
+        if (!configureInterface(hostInterface_, {"mtu", "1500", "up"}, error) ||
+            !configureInterface(transportInterface_, {"mtu", "1500", "up"}, error)) return false;
+        // Keep DHCP associated with the registered service's UUID.
+        if (!memberInterface_.empty()) return refreshNetworkService(hostInterface_, error);
+        return runCommand("/usr/sbin/ipconfig", {"set", hostInterface_, "DHCP"}, false, error);
+    };
+    if (activate()) return true;
+    const std::string activationError = error;
+    std::string cleanupError;
+    const bool cleaned = suspendNetwork(cleanupError);
+    error = activationError;
+    if (!cleaned) error += "; network rollback failed: " + cleanupError;
+    return false;
 }
 
 bool VirtualEthernet::suspendNetwork(std::string& error) {
@@ -311,22 +329,37 @@ bool VirtualEthernet::suspendNetwork(std::string& error) {
         error = "network suspension requires an open root-owned Ethernet pair";
         return false;
     }
-    // Drop carrier as well as the lease so Network Settings does not report a
-    // paused/unplugged phone as connected until the DHCP lease expires.
-    bool stopped = !memberInterface_.empty() ||
-        runCommand("/usr/sbin/ipconfig", {"set", hostInterface_, "NONE"}, false, error);
-    if (memberAttached_) {
-        stopped = configureInterface(hostInterface_, {"deletem", memberInterface_}, error);
-        if (stopped) memberAttached_ = false;
+    // A successful runtime detach does not imply that preferences were applied.
+    // Retry the complete operation, including a pending preferences removal.
+    for (unsigned attempt = 0; attempt < 3; ++attempt) {
+        std::string failure;
+        auto record = [&](bool ok, const std::string& cause) {
+            if (!ok) { if (!failure.empty()) failure += "; "; failure += cause; }
+        };
+        std::string cause;
+        if (memberInterface_.empty()) {
+            record(runCommand("/usr/sbin/ipconfig", {"set", hostInterface_, "NONE"}, false, cause), cause);
+        }
+        if (memberAttached_) {
+            const bool detached = configureInterface(hostInterface_, {"deletem", memberInterface_}, cause);
+            if (detached) memberAttached_ = false;
+            record(detached, cause);
+        }
+        if (!memberInterface_.empty() && !memberAttached_) {
+            record(setNetworkServiceMember(hostInterface_, memberInterface_, false, cause), cause);
+        }
+        // Lower all of our endpoints even when preference cleanup fails. This
+        // revokes carrier while leaving other services and their settings alone.
+        record(configureInterface(transportInterface_, {"down"}, cause), cause);
+        if (!memberInterface_.empty()) {
+            record(configureInterface(memberInterface_, {"down"}, cause), cause);
+        }
+        record(configureInterface(hostInterface_, {"down"}, cause), cause);
+        if (failure.empty()) { error.clear(); return true; }
+        error = failure;
+        if (attempt != 2) std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
-    if (!memberInterface_.empty() && !memberAttached_) {
-        stopped = setNetworkServiceMember(hostInterface_, memberInterface_, false, error) && stopped;
-    }
-    bool lowered = configureInterface(transportInterface_, {"down"}, error);
-    if (!memberInterface_.empty()) {
-        lowered = configureInterface(memberInterface_, {"down"}, error) && lowered;
-    }
-    return stopped && lowered;
+    return false;
 }
 
 bool VirtualEthernet::readFrame(std::vector<uint8_t>& frame, bool& timedOut, std::string& error) {

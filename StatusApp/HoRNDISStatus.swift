@@ -7,19 +7,31 @@ private let horndisStatusVersion = Bundle.main.object(
     forInfoDictionaryKey: "CFBundleShortVersionString"
 ) as? String ?? "development"
 private let statusPath = "/var/run/horndis/status.json"
+private let supervisorStatusPath = "/var/run/horndis-supervisor/status.json"
 private let controlPath = "/var/run/horndis/control.sock"
 private let launchAgentLabel = "io.github.noahhhi.horndis.status"
 private let privilegedHelperPath = "/Library/PrivilegedHelperTools/io.github.noahhhi.horndis"
 private let launchDaemonPath = "/Library/LaunchDaemons/io.github.noahhhi.horndis.plist"
 private let launchDaemonLabel = "io.github.noahhhi.horndis"
 private let bugReportURL = URL(
-    string: "https://github.com/noahhhi/HoRNDIS-Userspace/issues/new?template=bug_report.yml"
+    string: "https://github.com/PurpleCoderBlue/WiredHotspot4macOS/issues/new?template=bug_report.yml"
 )!
+
+private let localizationBundle: Bundle = {
+    let preferences = Bundle.main.bundleIdentifier.flatMap {
+        UserDefaults.standard.persistentDomain(forName: $0)?["AppleLanguages"] as? [String]
+    }
+    return StatusLocalization.bundle(for: .main, applicationLanguages: preferences)
+}()
+
+private let appDisplayName = localizationBundle.localizedString(
+    forKey: "CFBundleDisplayName", value: "有线热点4macOS", table: "InfoPlist"
+)
 
 private func localized(_ key: String, fallback: String) -> String {
     NSLocalizedString(key,
                       tableName: "Localizable",
-                      bundle: .main,
+                      bundle: localizationBundle,
                       value: fallback,
                       comment: "")
 }
@@ -110,7 +122,7 @@ private enum ServiceAuthorizationManager {
                           code: Int(ENOENT),
                           userInfo: [NSLocalizedDescriptionKey:
                               localized("error.bundledToolMissingOrUnsafe",
-                                        fallback: "The bundled HoRNDIS network tool is missing or unsafe")])
+                                        fallback: "The bundled Wired Hotspot 4 macOS network tool is missing or unsafe")])
         }
 
         let source = """
@@ -221,8 +233,17 @@ private func ipv4Address(for interfaceName: String) -> String? {
 }
 
 private func readSnapshot() -> Snapshot {
-    guard let data = FileManager.default.contents(atPath: statusPath),
-          let runtime = try? JSONDecoder().decode(RuntimeStatus.self, from: data) else {
+    // The supervisor writes only to its own root-owned directory. Prefer the
+    // newest snapshot so a crash/error is visible before the old agent expires.
+    let candidates: [(RuntimeStatus, Date)] = [statusPath, supervisorStatusPath].compactMap { path in
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: path),
+              let size = attributes[.size] as? NSNumber, size.intValue <= 65_536,
+              let modified = attributes[.modificationDate] as? Date,
+              let data = FileManager.default.contents(atPath: path),
+              let runtime = try? JSONDecoder().decode(RuntimeStatus.self, from: data) else { return nil }
+        return (runtime, modified)
+    }
+    guard let runtime = candidates.max(by: { $0.1 < $1.1 })?.0 else {
         return Snapshot(runtime: nil,
                         state: .unavailable,
                         ipAddress: nil,
@@ -247,7 +268,7 @@ private func readSnapshot() -> Snapshot {
         message = address == nil
             ? localized("status.configuringDHCP", fallback: "Configuring DHCP")
             : localized("status.connected", fallback: "USB tethering connected")
-    case "connecting":
+    case "starting", "connecting":
         displayState = .connecting
         message = localized("status.connecting", fallback: "Connecting")
     case "waiting":
@@ -446,6 +467,11 @@ private enum ControlClient {
                                         fallback: "Cannot create the control socket")])
         }
         defer { Darwin.close(descriptor) }
+        var suppressBrokenPipe: Int32 = 1
+        guard setsockopt(descriptor, SOL_SOCKET, SO_NOSIGPIPE,
+                         &suppressBrokenPipe, socklen_t(MemoryLayout<Int32>.size)) == 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
 
         var address = sockaddr_un()
         address.sun_family = sa_family_t(AF_UNIX)
@@ -479,7 +505,7 @@ private enum ControlClient {
                           code: Int(errno),
                           userInfo: [NSLocalizedDescriptionKey:
                               localized("error.cannotContactService",
-                                        fallback: "Cannot contact the HoRNDIS service")])
+                                        fallback: "Cannot contact the Wired Hotspot 4 macOS service")])
         }
         let bytes = Array(command.utf8)
         let written = bytes.withUnsafeBytes { buffer in
@@ -643,7 +669,7 @@ private final class StatusAppDelegate: NSObject, NSApplicationDelegate, NSMenuDe
     }
 
     private func configureNativeMenu() {
-        let menu = NSMenu(title: "HoRNDIS")
+        let menu = NSMenu(title: appDisplayName)
         menu.delegate = self
         menu.autoenablesItems = false
 
@@ -683,7 +709,7 @@ private final class StatusAppDelegate: NSObject, NSApplicationDelegate, NSMenuDe
 
         menu.addItem(.separator())
         menu.addItem(nativeActionItem(
-            localized("menu.quit", fallback: "Quit HoRNDIS Status"),
+            localized("menu.quit", fallback: "Quit Wired Hotspot 4 macOS"),
             action: #selector(quit),
             keyEquivalent: "q"
         ))
@@ -744,14 +770,14 @@ private final class StatusAppDelegate: NSObject, NSApplicationDelegate, NSMenuDe
         }
         if let button = statusItem.button,
            statusChanged || button.image == nil {
-            let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "HoRNDIS")
-                ?? NSImage(systemSymbolName: "network", accessibilityDescription: "HoRNDIS")
+            let image = NSImage(systemSymbolName: symbol, accessibilityDescription: appDisplayName)
+                ?? NSImage(systemSymbolName: "network", accessibilityDescription: appDisplayName)
             image?.isTemplate = true
             button.image = image
             // Let NSStatusBarButton apply its standard template-image effects so the
             // symbol follows the actual menu bar appearance, independently of app mode.
             button.contentTintColor = nil
-            button.toolTip = "HoRNDIS — \(snapshot.message)"
+            button.toolTip = "\(appDisplayName) — \(snapshot.message)"
         }
         if statusChanged {
             displayedStatusState = state
@@ -966,7 +992,7 @@ private final class StatusAppDelegate: NSObject, NSApplicationDelegate, NSMenuDe
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd-HHmmss"
-        return "HoRNDIS-Diagnostics-\(formatter.string(from: Date())).txt"
+        return "WiredHotspot4macOS-Diagnostics-\(formatter.string(from: Date())).txt"
     }
 
     @objc private func saveDiagnostics() {
@@ -980,7 +1006,7 @@ private final class StatusAppDelegate: NSObject, NSApplicationDelegate, NSMenuDe
     private func saveDiagnosticReport(openIssueAfterSaving: Bool) {
         guard let toolURL = bundledNetworkToolURL() else {
             interfaceError = localized("error.bundledToolMissing",
-                                       fallback: "The bundled HoRNDIS network tool is missing")
+                                       fallback: "The bundled Wired Hotspot 4 macOS network tool is missing")
             updateNativeVisibleContent()
             return
         }
@@ -995,7 +1021,7 @@ private final class StatusAppDelegate: NSObject, NSApplicationDelegate, NSMenuDe
         }
         let panel = NSSavePanel()
         panel.title = localized("diagnostics.savePanelTitle",
-                                fallback: "Save HoRNDIS Diagnostic Report")
+                                fallback: "Save Wired Hotspot 4 macOS Diagnostic Report")
         panel.nameFieldStringValue = diagnosticFilename()
         panel.allowedFileTypes = ["txt"]
         panel.canCreateDirectories = true
@@ -1125,22 +1151,22 @@ private func handleCommandLine() -> Bool {
         switch command {
         case "install":
             try LaunchAgentManager.installAndStart()
-            print("HoRNDIS menu bar status installed and started.")
+            print("Wired Hotspot 4 macOS menu bar status installed and started.")
         case "start", "open":
             try LaunchAgentManager.start()
-            print("HoRNDIS menu bar status started.")
+            print("Wired Hotspot 4 macOS menu bar status started.")
         case "stop", "quit":
             try LaunchAgentManager.stop()
-            print("HoRNDIS menu bar status stopped; login startup remains configured.")
+            print("Wired Hotspot 4 macOS menu bar status stopped; login startup remains configured.")
         case "restart":
             try LaunchAgentManager.restart()
-            print("HoRNDIS menu bar status restarted.")
+            print("Wired Hotspot 4 macOS menu bar status restarted.")
         case "status":
-            print("HoRNDIS menu bar status: \(LaunchAgentManager.isRunning ? "running" : "stopped")")
+            print("Wired Hotspot 4 macOS menu bar status: \(LaunchAgentManager.isRunning ? "running" : "stopped")")
             print("Launch at login: \(LaunchAgentManager.isInstalled ? "enabled" : "disabled")")
         case "uninstall":
             try LaunchAgentManager.uninstall()
-            print("HoRNDIS menu bar status stopped and removed.")
+            print("Wired Hotspot 4 macOS menu bar status stopped and removed.")
         case "--version", "version":
             print("horndis-status \(horndisStatusVersion)")
         case "--help", "help":

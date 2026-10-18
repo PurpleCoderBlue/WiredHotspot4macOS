@@ -48,6 +48,13 @@ int main() {
     assert(legacy.find("uid 501") == std::string::npos);
     assert(legacy.find("data agent as user") != std::string::npos);
 
+    // Already-anonymous current logs must retain their session identity and
+    // the actual network backend, including bridge interfaces.
+    const std::string current =
+        "horndis: connected device 2 to feth97\n"
+        "horndis: connected device 12 to bridge0\n";
+    assert(redactDiagnosticText(current) == current);
+
     std::cout << "Diagnostics redaction tests passed\n";
     return 0;
 }

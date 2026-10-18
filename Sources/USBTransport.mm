@@ -2,6 +2,7 @@
 #import "USBTransport.hpp"
 
 #import "RNDISProtocol.hpp"
+#import "USBDescriptors.hpp"
 
 #import <Foundation/Foundation.h>
 #import <IOKit/IOKitLib.h>
@@ -17,6 +18,7 @@
 #include <mutex>
 #include <sstream>
 #include <thread>
+#include <libkern/OSByteOrder.h>
 
 namespace horndis {
 namespace {
@@ -171,14 +173,21 @@ struct RNDISUSBTransport::Impl {
     __strong IOUSBHostPipe* bulkIn = nil;
     __strong IOUSBHostPipe* bulkOut = nil;
     __strong NSMutableData* bulkInData = nil;
-    __strong NSMutableData* bulkOutData[kBulkOutQueueDepth] = {};
-    bool bulkOutBusy[kBulkOutQueueDepth] = {};
+    // Completion blocks retain only this queue, never the transport or pipe.
+    // Late completions therefore keep request memory alive without a pipe cycle
+    // or access to a destroyed transport / a later session's queue.
+    struct OutputQueue {
+        __strong NSMutableData* bulkOutData[kBulkOutQueueDepth] = {};
+        bool bulkOutBusy[kBulkOutQueueDepth] = {};
+        std::mutex bulkOutMutex;
+        std::condition_variable bulkOutCondition;
+        size_t bulkOutInFlight = 0;
+        size_t nextBulkOutSlot = 0;
+        std::string bulkOutError;
+        bool cancelled = false;
+    };
+    std::shared_ptr<OutputQueue> output = std::make_shared<OutputQueue>();
     std::vector<uint8_t> bulkOutPacket;
-    std::mutex bulkOutMutex;
-    std::condition_variable bulkOutCondition;
-    size_t bulkOutInFlight = 0;
-    size_t nextBulkOutSlot = 0;
-    std::string bulkOutError;
     USBDeviceInfo device;
 };
 
@@ -219,11 +228,15 @@ std::vector<USBDeviceInfo> RNDISUSBTransport::scan() {
             continue;
         }
 
-        const auto data = std::find_if(interfaces.begin(), interfaces.end(), [&](const auto& candidate) {
-            return candidate.locationId == control.locationId && candidate.vendorId == control.vendorId &&
-                   candidate.productId == control.productId && candidate.interfaceClass == 0x0a;
-        });
-        if (data == interfaces.end()) {
+        std::vector<uint8_t> dataInterfaces;
+        size_t controlCount = 0;
+        for (const auto& candidate : interfaces) {
+            if (candidate.locationId != control.locationId || candidate.vendorId != control.vendorId ||
+                candidate.productId != control.productId) continue;
+            if (candidate.interfaceClass == 0x0a) dataInterfaces.push_back(candidate.number);
+            if (isRndisControl(candidate) || isECMControl(candidate) || isNCMControl(candidate)) ++controlCount;
+        }
+        if (dataInterfaces.empty()) {
             continue;
         }
 
@@ -233,7 +246,10 @@ std::vector<USBDeviceInfo> RNDISUSBTransport::scan() {
         device.vendorId = control.vendorId;
         device.productId = control.productId;
         device.controlInterfaceNumber = control.number;
-        device.dataInterfaceNumber = data->number;
+        // Discovery alone cannot associate multiple functions. Resolve their
+        // union/IAD descriptors after opening only the chosen control interface.
+        device.dataInterfaceKnown = dataInterfaces.size() == 1 && controlCount == 1;
+        if (device.dataInterfaceKnown) device.dataInterfaceNumber = dataInterfaces.front();
         device.product = control.product;
         device.serial = control.serial;
         device.supported = protocol == USBNetworkProtocol::RNDIS;
@@ -254,12 +270,6 @@ bool RNDISUSBTransport::open(const USBDeviceInfo& device, std::string& error) {
         error = "RNDIS control interface disappeared";
         return false;
     }
-    io_service_t dataService = findInterfaceService(device, device.dataInterfaceNumber);
-    if (dataService == IO_OBJECT_NULL) {
-        IOObjectRelease(controlService);
-        error = "RNDIS data interface disappeared";
-        return false;
-    }
 
     NSError* nsError = nil;
     impl_->control = [[IOUSBHostInterface alloc] initWithIOService:controlService
@@ -269,8 +279,29 @@ bool RNDISUSBTransport::open(const USBDeviceInfo& device, std::string& error) {
                                                   interestHandler:nil];
     IOObjectRelease(controlService);
     if (impl_->control == nil) {
-        IOObjectRelease(dataService);
         error = "cannot claim RNDIS control interface: " + nsErrorDescription(nsError);
+        return false;
+    }
+
+    const auto* controlConfiguration = impl_->control.configurationDescriptor;
+    if (controlConfiguration == nullptr) {
+        error = "RNDIS control interface has no configuration descriptor";
+        close();
+        return false;
+    }
+    // IOUSBHost owns and bounds this configuration descriptor buffer.
+    const size_t configurationLength = OSSwapLittleToHostInt16(controlConfiguration->wTotalLength);
+    const auto dataNumber = selectUSBDataInterface(
+        std::span(reinterpret_cast<const uint8_t*>(controlConfiguration), configurationLength),
+        device.controlInterfaceNumber, error);
+    if (!dataNumber) {
+        close();
+        return false;
+    }
+    io_service_t dataService = findInterfaceService(device, *dataNumber);
+    if (dataService == IO_OBJECT_NULL) {
+        error = "associated RNDIS data interface disappeared";
+        close();
         return false;
     }
 
@@ -327,6 +358,8 @@ bool RNDISUSBTransport::open(const USBDeviceInfo& device, std::string& error) {
     }
 
     impl_->device = device;
+    impl_->device.dataInterfaceNumber = *dataNumber;
+    impl_->device.dataInterfaceKnown = true;
     return true;
 }
 
@@ -376,8 +409,27 @@ bool RNDISUSBTransport::exchangeControl(const std::vector<uint8_t>& requestBytes
                             completionTimeout:1.0
                                         error:&nsError] && transferred >= 8) {
             const auto* begin = static_cast<const uint8_t*>(responseData.bytes);
-            response.assign(begin, begin + transferred);
-            return true;
+            if (transferred > responseData.length) {
+                error = "RNDIS control response exceeds its receive buffer";
+                return false;
+            }
+            const std::span<const uint8_t> message(begin, transferred);
+            const auto type = rndis::load32(message, 0);
+            if (type == 0x00000007) { // asynchronous INDICATE_STATUS
+                const auto length = rndis::load32(message, 4);
+                if (length < 20 || length > transferred) {
+                    error = "RNDIS status indication has an invalid length";
+                    return false;
+                }
+                // A notification is not the completion of the pending query.
+                continue;
+            }
+            if (type == (rndis::load32(requestBytes, 0) | 0x80000000U) &&
+                transferred >= 16 &&
+                rndis::load32(message, 8) == rndis::load32(requestBytes, 8)) {
+                response.assign(begin, begin + transferred);
+                return true;
+            }
         }
         if (nsError != nil && !isTimeout(nsError)) {
             error = "RNDIS GetEncapsulatedResponse failed: " + nsErrorDescription(nsError);
@@ -399,7 +451,13 @@ bool RNDISUSBTransport::initialize(std::vector<uint8_t>& deviceAddress, std::str
     if (!result.has_value()) {
         return false;
     }
-    maxTransferSize_ = std::clamp(result->maxTransferSize, 2048U, 1024U * 1024U);
+    // INITIALIZE advertises OUR receive capacity. INITIALIZE_COMPLETE reports
+    // the DEVICE'S receive capacity, which limits the opposite (bulk OUT) path.
+    maxTransmitSize_ = result->maxTransferSize;
+    if (maxTransmitSize_ < 1514 + 44) {
+        error = "RNDIS device cannot receive the configured 1500-byte MTU";
+        return false;
+    }
 
     const uint32_t queryId = nextRequestId_++;
     response.clear();
@@ -482,47 +540,71 @@ bool RNDISUSBTransport::writeEthernetFrame(const std::vector<uint8_t>& frame, st
             error = "RNDIS bulk output endpoint is not open";
             return false;
         }
+        if (frame.size() < 14 || frame.size() > 1514) {
+            error = "Ethernet frame does not fit the configured 1500-byte MTU";
+            return false;
+        }
         if (!rndis::wrapEthernetFrame(frame, impl_->bulkOutPacket)) {
             error = "Ethernet frame is too large for an RNDIS packet";
             return false;
         }
+        const auto* descriptors = impl_->bulkOut.descriptors;
+        const uint16_t maxPacket = descriptors == nullptr ? 0 :
+            OSSwapLittleToHostInt16(descriptors->descriptor.wMaxPacketSize) & 0x7ff;
+        if (maxPacket == 0) {
+            error = "RNDIS bulk output endpoint has an invalid maximum packet size";
+            return false;
+        }
+        // RNDIS requires a short final USB packet. Its trailing zero is outside
+        // MessageLength, which continues to describe only the RNDIS message.
+        if (impl_->bulkOutPacket.size() % maxPacket == 0) {
+            impl_->bulkOutPacket.push_back(0);
+        }
+        if (impl_->bulkOutPacket.size() > maxTransmitSize_) {
+            error = "RNDIS transfer exceeds the device's negotiated receive limit";
+            return false;
+        }
 
+        const auto state = impl_->output;
         size_t slot = 0;
         {
-            std::unique_lock lock(impl_->bulkOutMutex);
-            impl_->bulkOutCondition.wait(lock, [&] {
-                return !impl_->bulkOutError.empty() ||
-                       impl_->bulkOutInFlight < Impl::kBulkOutQueueDepth;
-            });
-            if (!impl_->bulkOutError.empty()) {
-                error = impl_->bulkOutError;
+            std::unique_lock lock(state->bulkOutMutex);
+            if (!state->bulkOutCondition.wait_for(lock, std::chrono::seconds(5), [&] {
+                return state->cancelled || !state->bulkOutError.empty() ||
+                       state->bulkOutInFlight < Impl::kBulkOutQueueDepth;
+            })) state->bulkOutError = "RNDIS bulk output queue timed out";
+            if (state->cancelled) {
+                error = "RNDIS bulk output was cancelled";
+                return false;
+            }
+            if (!state->bulkOutError.empty()) {
+                error = state->bulkOutError;
                 return false;
             }
             for (size_t offset = 0; offset < Impl::kBulkOutQueueDepth; ++offset) {
-                const size_t candidate = (impl_->nextBulkOutSlot + offset) %
+                const size_t candidate = (state->nextBulkOutSlot + offset) %
                                          Impl::kBulkOutQueueDepth;
-                if (!impl_->bulkOutBusy[candidate]) {
+                if (!state->bulkOutBusy[candidate]) {
                     slot = candidate;
                     break;
                 }
             }
-            impl_->bulkOutBusy[slot] = true;
-            ++impl_->bulkOutInFlight;
-            impl_->nextBulkOutSlot = (slot + 1) % Impl::kBulkOutQueueDepth;
+            state->bulkOutBusy[slot] = true;
+            ++state->bulkOutInFlight;
+            state->nextBulkOutSlot = (slot + 1) % Impl::kBulkOutQueueDepth;
         }
 
-        if (impl_->bulkOutData[slot] == nil) {
-            impl_->bulkOutData[slot] = [[NSMutableData alloc] initWithCapacity:2048];
+        if (state->bulkOutData[slot] == nil) {
+            state->bulkOutData[slot] = [[NSMutableData alloc] initWithCapacity:2048];
         }
-        impl_->bulkOutData[slot].length = impl_->bulkOutPacket.size();
+        state->bulkOutData[slot].length = impl_->bulkOutPacket.size();
         std::copy(impl_->bulkOutPacket.begin(),
                   impl_->bulkOutPacket.end(),
-                  static_cast<uint8_t*>(impl_->bulkOutData[slot].mutableBytes));
+                  static_cast<uint8_t*>(state->bulkOutData[slot].mutableBytes));
 
         const size_t expectedBytes = impl_->bulkOutPacket.size();
-        Impl* const state = impl_.get();
         NSError* nsError = nil;
-        if (![impl_->bulkOut enqueueIORequestWithData:impl_->bulkOutData[slot]
+        if (![impl_->bulkOut enqueueIORequestWithData:state->bulkOutData[slot]
                                     completionTimeout:5.0
                                                 error:&nsError
                                     completionHandler:^(IOReturn status, NSUInteger transferred) {
@@ -543,10 +625,10 @@ bool RNDISUSBTransport::writeEthernetFrame(const std::vector<uint8_t>& frame, st
             }
         }]) {
             {
-                std::lock_guard lock(impl_->bulkOutMutex);
-                impl_->bulkOutBusy[slot] = false;
-                --impl_->bulkOutInFlight;
-                impl_->bulkOutCondition.notify_all();
+                std::lock_guard lock(state->bulkOutMutex);
+                state->bulkOutBusy[slot] = false;
+                --state->bulkOutInFlight;
+                state->bulkOutCondition.notify_all();
             }
             error = "RNDIS bulk write failed: " + nsErrorDescription(nsError);
             return false;
@@ -555,45 +637,39 @@ bool RNDISUSBTransport::writeEthernetFrame(const std::vector<uint8_t>& frame, st
     }
 }
 
+void RNDISUSBTransport::cancelWrites() {
+    const auto state = impl_->output;
+    std::lock_guard lock(state->bulkOutMutex);
+    state->cancelled = true;
+    state->bulkOutCondition.notify_all();
+}
+
 void RNDISUSBTransport::close() {
     pendingFrames_.clear();
-    if (!impl_) {
-        return;
-    }
+    if (!impl_) return;
+    cancelWrites();
+    const auto state = impl_->output;
+    bool pending;
     {
-        std::unique_lock lock(impl_->bulkOutMutex);
-        const bool drained = impl_->bulkOutCondition.wait_for(lock, std::chrono::seconds(6), [&] {
-            return impl_->bulkOutInFlight == 0;
+        std::lock_guard lock(state->bulkOutMutex);
+        pending = state->bulkOutInFlight != 0;
+    }
+    if (pending && impl_->bulkOut != nil) [impl_->bulkOut abortWithError:nil];
+    {
+        std::unique_lock lock(state->bulkOutMutex);
+        (void)state->bulkOutCondition.wait_for(lock, std::chrono::milliseconds(250), [&] {
+            return state->bulkOutInFlight == 0;
         });
-        lock.unlock();
-        if (!drained && impl_->bulkOut != nil) {
-            [impl_->bulkOut abortWithError:nil];
-            lock.lock();
-            impl_->bulkOutCondition.wait(lock, [&] {
-                return impl_->bulkOutInFlight == 0;
-            });
-        }
     }
     impl_->bulkIn = nil;
     impl_->bulkOut = nil;
     impl_->bulkInData = nil;
-    for (size_t slot = 0; slot < Impl::kBulkOutQueueDepth; ++slot) {
-        impl_->bulkOutData[slot] = nil;
-        impl_->bulkOutBusy[slot] = false;
-    }
-    impl_->bulkOutInFlight = 0;
-    impl_->nextBulkOutSlot = 0;
-    impl_->bulkOutError.clear();
     impl_->bulkOutPacket.clear();
     impl_->bulkOutPacket.shrink_to_fit();
-    if (impl_->data != nil) {
-        [impl_->data destroy];
-        impl_->data = nil;
-    }
-    if (impl_->control != nil) {
-        [impl_->control destroy];
-        impl_->control = nil;
-    }
+    if (impl_->data != nil) [impl_->data destroy];
+    if (impl_->control != nil) [impl_->control destroy];
+    // Each session gets separate buffers, counters and cancellation state.
+    impl_ = std::make_unique<Impl>();
 }
 
 } // namespace horndis

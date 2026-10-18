@@ -17,7 +17,7 @@ brew install --cask noahhhi/tap/horndis
 
 Or install the package directly:
 
-1. Download the universal `.pkg` from [GitHub Releases](https://github.com/noahhhi/HoRNDIS-Userspace/releases).
+1. Download the universal `.pkg` from [GitHub Releases](https://github.com/PurpleCoderBlue/WiredHotspot4macOS/releases).
 2. Try to open the downloaded `.pkg`.
 3. If macOS blocks it, open **System Settings → Privacy & Security**.
 4. Click **Open Anyway** for the HoRNDIS package.
@@ -34,7 +34,7 @@ Enable **USB tethering** in Android settings. The service will discover the RNDI
 
 ## Menu bar
 
-The app uses standard macOS bundle localization and follows the system or per-app language selection. Included languages are English, Simplified Chinese, Traditional Chinese, Japanese, Korean, French, German, Spanish, Brazilian Portuguese, Italian, and Russian. Change the per-app language in **System Settings → General → Language & Region → Applications**, then reopen HoRNDIS Status.
+The app defaults to Simplified Chinese; an explicit macOS per-app language selection takes precedence without changing system language preferences. Included languages are English, Simplified Chinese, Traditional Chinese, Japanese, Korean, French, German, Spanish, Brazilian Portuguese, Italian, and Russian. Change the per-app language in **System Settings → General → Language & Region → Applications**, then reopen Wired Hotspot 4 macOS.
 
 The status item uses Apple SF Symbols and is deliberately compact by default:
 

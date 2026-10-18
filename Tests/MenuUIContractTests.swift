@@ -11,7 +11,7 @@ private enum MenuUIContractTests {
         let requiredFragments = [
             "NSApplicationDelegate, NSMenuDelegate",
             "NSStatusBar.system.statusItem",
-            "let menu = NSMenu(title: \"HoRNDIS\")",
+            "let menu = NSMenu(title: appDisplayName)",
             "menu.autoenablesItems = false",
             "private func nativeStateItem",
             "symbol: String? = nil",

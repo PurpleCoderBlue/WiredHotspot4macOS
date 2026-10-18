@@ -47,7 +47,7 @@ int main(int argc, char* argv[]) {
                                                 "RNDISUSBTransport::writeEthernetFrame",
                                                 "RNDISUSBTransport::close");
     assert(writeBody.find("@autoreleasepool") != std::string::npos);
-    assert(writeBody.find("impl_->bulkOutData") != std::string::npos);
+    assert(writeBody.find("state->bulkOutData") != std::string::npos);
     assert(writeBody.find("impl_->bulkOutPacket") != std::string::npos);
     assert(writeBody.find("enqueueIORequestWithData:") != std::string::npos);
     assert(writeBody.find("bulkOutCondition.wait") != std::string::npos);

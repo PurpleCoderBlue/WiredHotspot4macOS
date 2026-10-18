@@ -1,0 +1,345 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXFileReference section */
+		0085A482F904517C3E9D4564 /* DeviceAliases.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = DeviceAliases.hpp; sourceTree = "<group>"; };
+		009D55F03778B02F94AEA794 /* VirtualEthernet.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = VirtualEthernet.hpp; sourceTree = "<group>"; };
+		00B642AC43E782D3AB1B3DED /* ControlServer.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ControlServer.hpp; sourceTree = "<group>"; };
+		0397A10E216049AF3D13CA78 /* USBTransportMemoryContractTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = USBTransportMemoryContractTests.cpp; sourceTree = "<group>"; };
+		05687B318D142A7AD316442F /* ServiceManager.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ServiceManager.hpp; sourceTree = "<group>"; };
+		0CD53CE7591D9B35ED8126F6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		10E0742536801A4955F80000 /* Diagnostics.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Diagnostics.mm; sourceTree = "<group>"; };
+		12043FC6FB5A8E1E0289172B /* DiagnosticsPrivacyContractTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = DiagnosticsPrivacyContractTests.cpp; sourceTree = "<group>"; };
+		12596EA88749ED8EB1894FB1 /* Diagnostics.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Diagnostics.hpp; sourceTree = "<group>"; };
+		13F564FA6CE92394F8423BBC /* README.zh-CN.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = "README.zh-CN.md"; sourceTree = "<group>"; };
+		15A5897E78FFC5B5632DD22B /* USBTransport.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = USBTransport.mm; sourceTree = "<group>"; };
+		16DA7992151C456A92874431 /* NetworkService.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NetworkService.cpp; sourceTree = "<group>"; };
+		2237C6E296F8026C138CB83E /* DeviceAliasesTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = DeviceAliasesTests.cpp; sourceTree = "<group>"; };
+		247A497602D25F25DC8C854B /* RuntimeStatusTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = RuntimeStatusTests.cpp; sourceTree = "<group>"; };
+		2583620C86A788BF15432A43 /* SupervisorChannel.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SupervisorChannel.cpp; sourceTree = "<group>"; };
+		2A4289024F86CA3C8BDA7891 /* RuntimeStatus.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = RuntimeStatus.hpp; sourceTree = "<group>"; };
+		2FA0FE74F9865751D7D665C4 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
+		31B8E9B4B45667DDF11676D0 /* InterfaceSelection.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = InterfaceSelection.hpp; sourceTree = "<group>"; };
+		34AC81B563B3C2335B454635 /* USBDescriptors.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = USBDescriptors.cpp; sourceTree = "<group>"; };
+		357E5692012D17C5E3A5009D /* AgentSandbox.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = AgentSandbox.cpp; sourceTree = "<group>"; };
+		3EA944D6D84F1CFBE5532B18 /* VirtualEthernet.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = VirtualEthernet.cpp; sourceTree = "<group>"; };
+		427E0E0DFB0CB0F7C9C8177A /* NetworkServiceTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NetworkServiceTests.cpp; sourceTree = "<group>"; };
+		4E136150C832470CFCDCFF1E /* LIMITATIONS.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = LIMITATIONS.md; sourceTree = "<group>"; };
+		53CD1CA8A99351A46E39643E /* RNDISProtocol.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = RNDISProtocol.hpp; sourceTree = "<group>"; };
+		53CFE0A76135F1BBEC36F343 /* MENU_UI_GUIDELINES.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = MENU_UI_GUIDELINES.md; sourceTree = "<group>"; };
+		58B90A6474B7F586284068CF /* SupervisorChannelTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SupervisorChannelTests.cpp; sourceTree = "<group>"; };
+		5A26F2E267D2C69FA69C0847 /* AgentSandbox.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = AgentSandbox.hpp; sourceTree = "<group>"; };
+		5B4D2F71FE7A81DE771D0B5B /* InterfaceLifecycleContractTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = InterfaceLifecycleContractTests.cpp; sourceTree = "<group>"; };
+		62DF802F13B0C9A0811DBBF8 /* ControlServerTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ControlServerTests.cpp; sourceTree = "<group>"; };
+		64B4866B5D2A903AB81FCB68 /* InterfaceSelection.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = InterfaceSelection.cpp; sourceTree = "<group>"; };
+		660F880D5BA9B561BCFCCB49 /* MenuUIContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuUIContractTests.swift; sourceTree = "<group>"; };
+		6BDCD60049BC0CD231D7B6C9 /* horndis-uninstall */ = {isa = PBXFileReference; lastKnownFileType = text; path = "horndis-uninstall"; sourceTree = "<group>"; };
+		6DB27F5D4A58E09758EF6B74 /* ControlServer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ControlServer.cpp; sourceTree = "<group>"; };
+		76ED074A9305C04054CDEBB9 /* Makefile */ = {isa = PBXFileReference; lastKnownFileType = text; path = Makefile; sourceTree = "<group>"; };
+		779CA784F98008FE8140077E /* USBTransport.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = USBTransport.hpp; sourceTree = "<group>"; };
+		7850706B6F1D61ED3535C8D1 /* RNDISProtocolTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = RNDISProtocolTests.cpp; sourceTree = "<group>"; };
+		7C6404CDC9261AF5475800D0 /* AgentSandboxTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = AgentSandboxTests.cpp; sourceTree = "<group>"; };
+		8CE7DAA222E29546BDC51331 /* components.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = components.plist; sourceTree = "<group>"; };
+		8E614B9D7D42201682A6B9EE /* USER_GUIDE.zh-CN.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = "USER_GUIDE.zh-CN.md"; sourceTree = "<group>"; };
+		921F10ADE2DB9B724DB3BE76 /* ServiceManager.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ServiceManager.cpp; sourceTree = "<group>"; };
+		9356E25213923E04C064EB49 /* BUG_REPORTING.zh-CN.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = "BUG_REPORTING.zh-CN.md"; sourceTree = "<group>"; };
+		946B4880C5C902033E55020B /* GenerateAppIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerateAppIcon.swift; sourceTree = "<group>"; };
+		94D2918E54B3F131CFBE857B /* DHCPReconnectContractTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = DHCPReconnectContractTests.cpp; sourceTree = "<group>"; };
+		987E40DB5FA0CCD7A3E4BD03 /* SupervisorChannel.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = SupervisorChannel.hpp; sourceTree = "<group>"; };
+		9B4CED6D64FDE1D916FD7B3A /* horndis.1 */ = {isa = PBXFileReference; lastKnownFileType = text; path = horndis.1; sourceTree = "<group>"; };
+		9BC6BACFDEEBD4A3D85F8EF3 /* DiagnosticsRedactionTests.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = DiagnosticsRedactionTests.mm; sourceTree = "<group>"; };
+		A8AEB601CB9D4B0965E13239 /* BUG_REPORTING.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = BUG_REPORTING.md; sourceTree = "<group>"; };
+		B02C6C064DFF3BA758BDE2DF /* InterfaceSelectionTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = InterfaceSelectionTests.cpp; sourceTree = "<group>"; };
+		B335630551682C19A781AFEB /* README.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = README.md; sourceTree = "<group>"; };
+		B4ED219B67094177CBFD98EF /* ServiceInstallationContractTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ServiceInstallationContractTests.cpp; sourceTree = "<group>"; };
+		B4FEF9846CEF16905E2A9D44 /* USBTransportTests.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = USBTransportTests.mm; sourceTree = "<group>"; };
+		B91B2E237770CC52266EF788 /* PRIVILEGE_MODEL.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = PRIVILEGE_MODEL.md; sourceTree = "<group>"; };
+		C09C7F7632C57D440B5AC204 /* AppLanguageProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLanguageProbe.swift; sourceTree = "<group>"; };
+		C2391AFD776DD3E92DE4F4E6 /* RuntimeStatus.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = RuntimeStatus.cpp; sourceTree = "<group>"; };
+		C9E79BD9C348B38575101F51 /* USER_GUIDE.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = USER_GUIDE.md; sourceTree = "<group>"; };
+		D5BCEBDF3524A6980BC51862 /* HoRNDISStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoRNDISStatus.swift; sourceTree = "<group>"; };
+		D7A8BB3FC37D6D4CC56BCE20 /* USBDescriptors.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = USBDescriptors.hpp; sourceTree = "<group>"; };
+		DB037F20F981ED21D935D3D3 /* RuntimeFilesTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = RuntimeFilesTests.cpp; sourceTree = "<group>"; };
+		E186E4F8AB83EDF8B4BECF39 /* NetworkService.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NetworkService.hpp; sourceTree = "<group>"; };
+		ED9B5FF60ABC8309A0A0A6B3 /* USBDescriptorsTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = USBDescriptorsTests.cpp; sourceTree = "<group>"; };
+		F48C64F4C565F2553F65881C /* RNDISProtocol.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = RNDISProtocol.cpp; sourceTree = "<group>"; };
+		F6ED156E4BF5C79168066246 /* SECURITY.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = SECURITY.md; sourceTree = "<group>"; };
+		B919CBBD829C8338852F287B /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Localization.swift"; sourceTree = "<group>"; };
+		564A9C1D2B69572F4285BB8F /* NetworkLifecycleTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = "NetworkLifecycleTests.cpp"; sourceTree = "<group>"; };
+		5926C3262D90B207FF09DA4D /* NetworkPreferencesTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = "NetworkPreferencesTests.cpp"; sourceTree = "<group>"; };
+		AA5E4056296D0AFDF1EF1B9E /* README.en.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = "README.en.md"; sourceTree = "<group>"; };
+		DB2A99150F1340DA968BA001 /* PackageContentsTests.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = PackageContentsTests.py; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0A3E27B8CA818264D75C8D81 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		0D62BB01DF4EDD9592050745 /* Packaging */ = {
+			isa = PBXGroup;
+			children = (
+				8CE7DAA222E29546BDC51331 /* components.plist */,
+				6BDCD60049BC0CD231D7B6C9 /* horndis-uninstall */,
+			);
+			path = Packaging;
+			sourceTree = "<group>";
+		};
+		0D6E4079E36703EBD37C0072 = {
+			isa = PBXGroup;
+			children = (
+				CAF85B0888D78F1F83771A07 /* Sources */,
+				F48ADBD2EED6405A4C3F9EDD /* StatusApp */,
+				E5C9D7030BADA2FE792AD7E4 /* Tests */,
+				46B42B4229CD7A39C564E780 /* docs */,
+				C205924DE0FE636CCDDE4ED6 /* Documentation */,
+				0D62BB01DF4EDD9592050745 /* Packaging */,
+				76ED074A9305C04054CDEBB9 /* Makefile */,
+				B335630551682C19A781AFEB /* README.md */,
+				AA5E4056296D0AFDF1EF1B9E /* README.en.md */,
+				13F564FA6CE92394F8423BBC /* README.zh-CN.md */,
+				F6ED156E4BF5C79168066246 /* SECURITY.md */,
+				0A3E27B8CA818264D75C8D81 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		46B42B4229CD7A39C564E780 /* docs */ = {
+			isa = PBXGroup;
+			children = (
+				A8AEB601CB9D4B0965E13239 /* BUG_REPORTING.md */,
+				9356E25213923E04C064EB49 /* BUG_REPORTING.zh-CN.md */,
+				4E136150C832470CFCDCFF1E /* LIMITATIONS.md */,
+				53CFE0A76135F1BBEC36F343 /* MENU_UI_GUIDELINES.md */,
+				B91B2E237770CC52266EF788 /* PRIVILEGE_MODEL.md */,
+				C9E79BD9C348B38575101F51 /* USER_GUIDE.md */,
+				8E614B9D7D42201682A6B9EE /* USER_GUIDE.zh-CN.md */,
+			);
+			path = docs;
+			sourceTree = "<group>";
+		};
+		C205924DE0FE636CCDDE4ED6 /* Documentation */ = {
+			isa = PBXGroup;
+			children = (
+				9B4CED6D64FDE1D916FD7B3A /* horndis.1 */,
+			);
+			path = Documentation;
+			sourceTree = "<group>";
+		};
+		CAF85B0888D78F1F83771A07 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				357E5692012D17C5E3A5009D /* AgentSandbox.cpp */,
+				5A26F2E267D2C69FA69C0847 /* AgentSandbox.hpp */,
+				6DB27F5D4A58E09758EF6B74 /* ControlServer.cpp */,
+				00B642AC43E782D3AB1B3DED /* ControlServer.hpp */,
+				0085A482F904517C3E9D4564 /* DeviceAliases.hpp */,
+				12596EA88749ED8EB1894FB1 /* Diagnostics.hpp */,
+				10E0742536801A4955F80000 /* Diagnostics.mm */,
+				64B4866B5D2A903AB81FCB68 /* InterfaceSelection.cpp */,
+				31B8E9B4B45667DDF11676D0 /* InterfaceSelection.hpp */,
+				16DA7992151C456A92874431 /* NetworkService.cpp */,
+				E186E4F8AB83EDF8B4BECF39 /* NetworkService.hpp */,
+				F48C64F4C565F2553F65881C /* RNDISProtocol.cpp */,
+				53CD1CA8A99351A46E39643E /* RNDISProtocol.hpp */,
+				C2391AFD776DD3E92DE4F4E6 /* RuntimeStatus.cpp */,
+				2A4289024F86CA3C8BDA7891 /* RuntimeStatus.hpp */,
+				921F10ADE2DB9B724DB3BE76 /* ServiceManager.cpp */,
+				05687B318D142A7AD316442F /* ServiceManager.hpp */,
+				2583620C86A788BF15432A43 /* SupervisorChannel.cpp */,
+				987E40DB5FA0CCD7A3E4BD03 /* SupervisorChannel.hpp */,
+				34AC81B563B3C2335B454635 /* USBDescriptors.cpp */,
+				D7A8BB3FC37D6D4CC56BCE20 /* USBDescriptors.hpp */,
+				779CA784F98008FE8140077E /* USBTransport.hpp */,
+				15A5897E78FFC5B5632DD22B /* USBTransport.mm */,
+				3EA944D6D84F1CFBE5532B18 /* VirtualEthernet.cpp */,
+				009D55F03778B02F94AEA794 /* VirtualEthernet.hpp */,
+				2FA0FE74F9865751D7D665C4 /* main.mm */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		E5C9D7030BADA2FE792AD7E4 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				7C6404CDC9261AF5475800D0 /* AgentSandboxTests.cpp */,
+				C09C7F7632C57D440B5AC204 /* AppLanguageProbe.swift */,
+				62DF802F13B0C9A0811DBBF8 /* ControlServerTests.cpp */,
+				94D2918E54B3F131CFBE857B /* DHCPReconnectContractTests.cpp */,
+				2237C6E296F8026C138CB83E /* DeviceAliasesTests.cpp */,
+				12043FC6FB5A8E1E0289172B /* DiagnosticsPrivacyContractTests.cpp */,
+				9BC6BACFDEEBD4A3D85F8EF3 /* DiagnosticsRedactionTests.mm */,
+				5B4D2F71FE7A81DE771D0B5B /* InterfaceLifecycleContractTests.cpp */,
+				B02C6C064DFF3BA758BDE2DF /* InterfaceSelectionTests.cpp */,
+				660F880D5BA9B561BCFCCB49 /* MenuUIContractTests.swift */,
+				427E0E0DFB0CB0F7C9C8177A /* NetworkServiceTests.cpp */,
+				DB2A99150F1340DA968BA001 /* PackageContentsTests.py */,
+				5926C3262D90B207FF09DA4D /* NetworkPreferencesTests.cpp */,
+				564A9C1D2B69572F4285BB8F /* NetworkLifecycleTests.cpp */,
+				7850706B6F1D61ED3535C8D1 /* RNDISProtocolTests.cpp */,
+				DB037F20F981ED21D935D3D3 /* RuntimeFilesTests.cpp */,
+				247A497602D25F25DC8C854B /* RuntimeStatusTests.cpp */,
+				B4ED219B67094177CBFD98EF /* ServiceInstallationContractTests.cpp */,
+				58B90A6474B7F586284068CF /* SupervisorChannelTests.cpp */,
+				ED9B5FF60ABC8309A0A0A6B3 /* USBDescriptorsTests.cpp */,
+				0397A10E216049AF3D13CA78 /* USBTransportMemoryContractTests.cpp */,
+				B4FEF9846CEF16905E2A9D44 /* USBTransportTests.mm */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		F48ADBD2EED6405A4C3F9EDD /* StatusApp */ = {
+			isa = PBXGroup;
+			children = (
+				946B4880C5C902033E55020B /* GenerateAppIcon.swift */,
+				D5BCEBDF3524A6980BC51862 /* HoRNDISStatus.swift */,
+				B919CBBD829C8338852F287B /* Localization.swift */,
+				0CD53CE7591D9B35ED8126F6 /* Info.plist */,
+			);
+			path = StatusApp;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXLegacyTarget section */
+		072CE7380C539F145CA4D42F /* Regression Tests */ = {
+			isa = PBXLegacyTarget;
+			buildArgumentsString = "xcode-test";
+			buildConfigurationList = 29BAF678BE9B27F00CA15512 /* Build configuration list for PBXLegacyTarget "Regression Tests" */;
+			buildPhases = (
+			);
+			buildToolPath = /usr/bin/make;
+			buildWorkingDirectory = "$(SRCROOT)";
+			dependencies = (
+			);
+			name = "Regression Tests";
+			passBuildSettingsInEnvironment = 1;
+			productName = "Regression Tests";
+		};
+		4A2BC9B931C2DFA9D7B73C5B /* WiredHotspot4macOS */ = {
+			isa = PBXLegacyTarget;
+			buildArgumentsString = "xcode-build";
+			buildConfigurationList = A2CF176530498ED13617B3DF /* Build configuration list for PBXLegacyTarget "WiredHotspot4macOS" */;
+			buildPhases = (
+			);
+			buildToolPath = /usr/bin/make;
+			buildWorkingDirectory = "$(SRCROOT)";
+			dependencies = (
+			);
+			name = WiredHotspot4macOS;
+			passBuildSettingsInEnvironment = 1;
+			productName = WiredHotspot4macOS;
+		};
+/* End PBXLegacyTarget section */
+
+/* Begin PBXProject section */
+		244210E48437B6556980A702 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 1600;
+			};
+			buildConfigurationList = B4E10CAA9C5E22150B71559C /* Build configuration list for PBXProject "WiredHotspot4macOS" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 0D6E4079E36703EBD37C0072;
+			productRefGroup = 0A3E27B8CA818264D75C8D81 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				4A2BC9B931C2DFA9D7B73C5B /* WiredHotspot4macOS */,
+				072CE7380C539F145CA4D42F /* Regression Tests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin XCBuildConfiguration section */
+		0B0C687DF8B6B8DC790B519C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				ONLY_ACTIVE_ARCH = NO;
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+			};
+			name = Release;
+		};
+		3900ADB9E2C13B19298B0F64 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		482707F6DD0A353BD9087106 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			};
+			name = Release;
+		};
+		73EBF6644258C120893E685D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+			};
+			name = Debug;
+		};
+		79FE703679771F80297BC2AA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		BCE89EB7E01BCD0149A5761F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		29BAF678BE9B27F00CA15512 /* Build configuration list for PBXLegacyTarget "Regression Tests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				79FE703679771F80297BC2AA /* Debug */,
+				BCE89EB7E01BCD0149A5761F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A2CF176530498ED13617B3DF /* Build configuration list for PBXLegacyTarget "WiredHotspot4macOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3900ADB9E2C13B19298B0F64 /* Debug */,
+				482707F6DD0A353BD9087106 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B4E10CAA9C5E22150B71559C /* Build configuration list for PBXProject "WiredHotspot4macOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				73EBF6644258C120893E685D /* Debug */,
+				0B0C687DF8B6B8DC790B519C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 244210E48437B6556980A702 /* Project object */;
+}

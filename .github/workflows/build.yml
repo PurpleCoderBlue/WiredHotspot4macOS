@@ -6,7 +6,7 @@ on:
 
 jobs:
   macos:
-    runs-on: xcode-27
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
       - name: Build
@@ -36,11 +36,13 @@ jobs:
         run: |
           test "$(plutil -extract CFBundleIconFile raw build/HoRNDISStatus.app/Contents/Info.plist)" = "HoRNDISStatus"
           test -s build/HoRNDISStatus.app/Contents/Resources/HoRNDISStatus.icns
-          Scripts/build-package 0.0.0 build/HoRNDIS-Userspace-test.pkg
-          pkgutil --payload-files build/HoRNDIS-Userspace-test.pkg | grep -q "usr/local/bin/horndis"
-          ! pkgutil --payload-files build/HoRNDIS-Userspace-test.pkg | grep -q "usr/local/bin/horndis-status"
-          pkgutil --payload-files build/HoRNDIS-Userspace-test.pkg | grep -q "usr/local/share/man/man1/horndis.1"
-          pkgutil --payload-files build/HoRNDIS-Userspace-test.pkg | grep -q "Applications/HoRNDIS Status.app/Contents/Resources/HoRNDISStatus.icns"
+          version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' StatusApp/Info.plist)
+          Scripts/build-package "$version" build/WiredHotspot4macOS-test.pkg
+          pkgutil --payload-files build/WiredHotspot4macOS-test.pkg | grep -q "usr/local/bin/horndis"
+          ! pkgutil --payload-files build/WiredHotspot4macOS-test.pkg | grep -q "usr/local/bin/horndis-status"
+          pkgutil --payload-files build/WiredHotspot4macOS-test.pkg | grep -q "usr/local/share/man/man1/horndis.1"
+          pkgutil --payload-files build/WiredHotspot4macOS-test.pkg | grep -q "Applications/HoRNDIS Status.app/Contents/Resources/HoRNDISStatus.icns"
+          python3 Tests/PackageContentsTests.py build/WiredHotspot4macOS-test.pkg
       - name: Verify staged installation layout
         run: |
           stage="${RUNNER_TEMP}/horndis-stage"

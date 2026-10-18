@@ -15,7 +15,7 @@
 "menu.usbTethering" = "USB 網路共享";
 "menu.launchAtLogin" = "登入時啟動";
 "menu.details" = "詳細資訊";
-"menu.quit" = "結束 HoRNDIS 狀態列";
+"menu.quit" = "結束 有線熱點4macOS";
 "menu.saveDiagnosticReport" = "儲存診斷報告…";
 "menu.openServiceLog" = "開啟服務記錄";
 "menu.reportBug" = "回報問題…";
@@ -25,16 +25,16 @@
 "summary.configuring" = "設定中…";
 "summary.interface" = "介面";
 
-"diagnostics.savePanelTitle" = "儲存 HoRNDIS 診斷報告";
+"diagnostics.savePanelTitle" = "儲存 有線熱點4macOS 診斷報告";
 "diagnostics.failedTitle" = "診斷報告建立失敗";
 
-"error.bundledToolMissingOrUnsafe" = "內建的 HoRNDIS 網路工具遺失或權限不安全";
+"error.bundledToolMissingOrUnsafe" = "內建的 有線熱點4macOS 網路工具遺失或權限不安全";
 "error.cannotPrepareAuthorization" = "無法準備管理員授權要求";
 "error.authorizationCancelled" = "管理員授權已取消";
 "error.authorizationFailed" = "管理員授權失敗";
-"error.cannotContactService" = "無法連接 HoRNDIS 服務";
+"error.cannotContactService" = "無法連接 有線熱點4macOS 服務";
 "error.cannotSendConnectionRequest" = "無法傳送連線要求";
-"error.bundledToolMissing" = "內建的 HoRNDIS 網路工具遺失";
+"error.bundledToolMissing" = "內建的 有線熱點4macOS 網路工具遺失";
 "error.cannotCreateDiagnosticReport" = "無法建立診斷報告";
 "error.installationNotVerified" = "無法驗證特權服務是否已正確安裝";
 "error.launchctlExited" = "launchctl 已結束，狀態碼為 %d";

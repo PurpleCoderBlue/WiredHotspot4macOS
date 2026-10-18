@@ -34,6 +34,19 @@ package_root="${staging_directory}/root"
 /usr/bin/install -m 0644 "${repository_root}/Documentation/horndis.1" \
     "${package_root}/usr/local/share/man/man1/horndis.1"
 
+# Strip linker debug maps from public copies: they contain absolute build paths.
+# Keep local build products intact for debugging and sign the stripped copies.
+staged_app="${package_root}/Applications/HoRNDIS Status.app"
+staged_tool="${package_root}/usr/local/bin/horndis"
+embedded_tool="${staged_app}/Contents/Resources/horndis"
+/usr/bin/xcrun strip -S "${staged_tool}"
+/usr/bin/xcrun strip -S "${embedded_tool}"
+/usr/bin/codesign --force --sign - "${staged_tool}"
+/usr/bin/codesign --force --sign - "${embedded_tool}"
+/usr/bin/codesign --force --deep --sign - "${staged_app}"
+/usr/bin/codesign --verify --strict "${staged_tool}"
+/usr/bin/codesign --verify --deep --strict "${staged_app}"
+
 output_directory=${output_path:a:h}
 /bin/mkdir -p "${output_directory}"
 /usr/bin/pkgbuild \
@@ -48,3 +61,23 @@ output_directory=${output_path:a:h}
     --version "${version}" \
     --install-location / \
     "${output_path:a}"
+
+# macOS can retain non-removable provenance xattrs on newly staged files.
+# pkgbuild encodes those as AppleDouble entries after its path filters run.
+# Recreate only the payload with metadata disabled and root/wheel ownership,
+# retaining pkgbuild's component settings, script handling and file metadata.
+expanded_package="${staging_directory}/expanded"
+/usr/sbin/pkgutil --expand "${output_path:a}" "${expanded_package}"
+/usr/bin/tar -czf "${expanded_package}/Payload" --format=cpio \
+    --no-xattrs --no-acls --no-mac-metadata --uid 0 --gid 0 \
+    --uname root --gname wheel --exclude '*/._*' --exclude '*/.DS_Store' \
+    --exclude '*/.svn' --exclude '*/CVS' -C "${package_root}" .
+# Preserve modes, ownership and checksums of every real BOM entry.
+/usr/bin/lsbom "${expanded_package}/Bom" | \
+    /usr/bin/awk -F '\t' '$1 !~ /(^|\/)\._/' > "${staging_directory}/bom-files"
+/usr/bin/mkbom -i "${staging_directory}/bom-files" "${expanded_package}/Bom"
+file_count=$(/usr/bin/awk 'END { print NR }' "${staging_directory}/bom-files")
+/usr/bin/sed -i '' -E "s/numberOfFiles=\"[0-9]+\"/numberOfFiles=\"${file_count}\"/" \
+    "${expanded_package}/PackageInfo"
+/usr/sbin/pkgutil --flatten "${expanded_package}" "${staging_directory}/final.pkg"
+/bin/mv -f "${staging_directory}/final.pkg" "${output_path:a}"

@@ -15,7 +15,7 @@
 "menu.usbTethering" = "USB-Tethering";
 "menu.launchAtLogin" = "Bei Anmeldung öffnen";
 "menu.details" = "Details";
-"menu.quit" = "HoRNDIS Status beenden";
+"menu.quit" = "Wired Hotspot 4 macOS beenden";
 "menu.saveDiagnosticReport" = "Diagnosebericht sichern…";
 "menu.openServiceLog" = "Dienstprotokoll öffnen";
 "menu.reportBug" = "Problem melden…";
@@ -25,16 +25,16 @@
 "summary.configuring" = "Konfiguration…";
 "summary.interface" = "Schnittstelle";
 
-"diagnostics.savePanelTitle" = "HoRNDIS-Diagnosebericht sichern";
+"diagnostics.savePanelTitle" = "Wired Hotspot 4 macOS-Diagnosebericht sichern";
 "diagnostics.failedTitle" = "Diagnosebericht fehlgeschlagen";
 
-"error.bundledToolMissingOrUnsafe" = "Das enthaltene HoRNDIS-Netzwerktool fehlt oder ist unsicher";
+"error.bundledToolMissingOrUnsafe" = "Das enthaltene Wired Hotspot 4 macOS-Netzwerktool fehlt oder ist unsicher";
 "error.cannotPrepareAuthorization" = "Die Administratorautorisierung kann nicht vorbereitet werden";
 "error.authorizationCancelled" = "Die Administratorautorisierung wurde abgebrochen";
 "error.authorizationFailed" = "Die Administratorautorisierung ist fehlgeschlagen";
-"error.cannotContactService" = "Der HoRNDIS-Dienst kann nicht erreicht werden";
+"error.cannotContactService" = "Der Wired Hotspot 4 macOS-Dienst kann nicht erreicht werden";
 "error.cannotSendConnectionRequest" = "Die Verbindungsanfrage kann nicht gesendet werden";
-"error.bundledToolMissing" = "Das enthaltene HoRNDIS-Netzwerktool fehlt";
+"error.bundledToolMissing" = "Das enthaltene Wired Hotspot 4 macOS-Netzwerktool fehlt";
 "error.cannotCreateDiagnosticReport" = "Der Diagnosebericht konnte nicht erstellt werden";
 "error.installationNotVerified" = "Die Installation des privilegierten Dienstes konnte nicht überprüft werden";
 "error.launchctlExited" = "launchctl wurde mit Status %d beendet";

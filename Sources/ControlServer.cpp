@@ -14,10 +14,14 @@
 namespace horndis {
 namespace {
 
-constexpr const char* kRuntimeDirectory = "/var/run/horndis";
-constexpr const char* kControlPath = "/var/run/horndis/control.sock";
+uid_t consoleUserID() {
+    uid_t user = static_cast<uid_t>(-1); gid_t group = 0;
+    auto name = SCDynamicStoreCopyConsoleUser(nullptr, &user, &group);
+    if (name) CFRelease(name);
+    return user;
+}
 
-bool isConsoleUser(int descriptor) {
+bool isConsoleUser(int descriptor, uid_t consoleUser) {
     uid_t peerUser = 0;
     gid_t peerGroup = 0;
     if (getpeereid(descriptor, &peerUser, &peerGroup) != 0) {
@@ -26,18 +30,14 @@ bool isConsoleUser(int descriptor) {
     if (peerUser == 0) {
         return true;
     }
-    uid_t consoleUser = 0;
-    gid_t consoleGroup = 0;
-    CFStringRef userName = SCDynamicStoreCopyConsoleUser(nullptr, &consoleUser, &consoleGroup);
-    if (userName != nullptr) {
-        CFRelease(userName);
-    }
     return peerUser == consoleUser;
 }
 
 } // namespace
 
-ControlServer::ControlServer() = default;
+ControlServer::ControlServer(std::string directory, std::function<uid_t()> consoleUser)
+    : directory_(std::move(directory)), path_(directory_ + "/control.sock"),
+      consoleUser_(consoleUser ? std::move(consoleUser) : consoleUserID) {}
 
 ControlServer::~ControlServer() {
     close();
@@ -45,10 +45,16 @@ ControlServer::~ControlServer() {
 
 bool ControlServer::start(std::string& error) {
     close();
-    if (mkdir(kRuntimeDirectory, 0755) != 0 && errno != EEXIST) {
+    if (mkdir(directory_.c_str(), 0700) != 0 && errno != EEXIST) {
         error = "cannot create control socket directory: " + std::string(std::strerror(errno));
         return false;
     }
+    const int directoryFD = open(directory_.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    struct stat metadata{};
+    const bool secure = directoryFD >= 0 && fstat(directoryFD, &metadata) == 0 &&
+        metadata.st_uid == geteuid() && (metadata.st_mode & (S_IWGRP | S_IWOTH)) == 0;
+    if (directoryFD >= 0) ::close(directoryFD);
+    if (!secure) { error = "control socket directory is unsafe"; return false; }
     socket_ = socket(AF_UNIX, SOCK_STREAM, 0);
     if (socket_ < 0) {
         error = "cannot create control socket: " + std::string(std::strerror(errno));
@@ -63,11 +69,17 @@ bool ControlServer::start(std::string& error) {
     sockaddr_un address{};
     address.sun_family = AF_UNIX;
     address.sun_len = sizeof(address);
-    static_assert(sizeof(kControlPath) <= sizeof(address.sun_path));
-    std::strncpy(address.sun_path, kControlPath, sizeof(address.sun_path) - 1);
-    (void)unlink(kControlPath);
-    if (bind(socket_, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0 ||
-        chmod(kControlPath, 0600) != 0 || listen(socket_, 4) != 0) {
+    if (path_.size() >= sizeof(address.sun_path)) {
+        error = "control socket path is too long"; close(); return false;
+    }
+    std::strncpy(address.sun_path, path_.c_str(), sizeof(address.sun_path) - 1);
+    (void)unlink(path_.c_str());
+    if (bind(socket_, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0) {
+        error = "cannot bind control socket: " + std::string(std::strerror(errno));
+        close(); return false;
+    }
+    ownsPath_ = true;
+    if (chmod(path_.c_str(), 0600) != 0 || listen(socket_, 16) != 0) {
         error = "cannot publish control socket: " + std::string(std::strerror(errno));
         close();
         return false;
@@ -81,34 +93,45 @@ std::vector<ControlCommand> ControlServer::pollCommands() {
         return commands;
     }
 
-    // Drain a bounded batch so a visible menu's observation renewals cannot
-    // fill the listen queue or delay a later connect/disconnect command. The
-    // bound prevents a client from monopolizing the USB forwarding loop.
-    constexpr size_t kMaximumBatchSize = 16;
-    for (size_t index = 0; index < kMaximumBatchSize; ++index) {
+    constexpr size_t kMaximumClients = 16;
+    const auto now = std::chrono::steady_clock::now();
+    const uid_t consoleUser = consoleUser_();
+    for (size_t accepted = 0; accepted < kMaximumClients && clients_.size() < kMaximumClients; ++accepted) {
         const int client = accept(socket_, nullptr, nullptr);
-        if (client < 0) {
-            break;
+        if (client < 0) break;
+        const int flags = fcntl(client, F_GETFL);
+        if (!isConsoleUser(client, consoleUser) || flags < 0 ||
+            fcntl(client, F_SETFL, flags | O_NONBLOCK) != 0 ||
+            fcntl(client, F_SETFD, FD_CLOEXEC) != 0) {
+            ::close(client); continue;
         }
-        if (!isConsoleUser(client)) {
-            (void)::close(client);
-            continue;
+        clients_.push_back({client, {}, now + std::chrono::seconds(2)});
+    }
+    for (auto iterator = clients_.begin(); iterator != clients_.end();) {
+        bool finished = now >= iterator->deadline || !isConsoleUser(iterator->descriptor, consoleUser);
+        if (!finished) {
+            char buffer[32];
+            const auto count = read(iterator->descriptor, buffer, sizeof(buffer));
+            if (count > 0) {
+                iterator->input.append(buffer, static_cast<size_t>(count));
+                const auto newline = iterator->input.find('\n');
+                if (newline != std::string::npos) {
+                    const auto command = iterator->input.substr(0, newline);
+                    if (command == "connect") commands.push_back(ControlCommand::connect);
+                    else if (command == "disconnect") commands.push_back(ControlCommand::disconnect);
+                    else if (command == "observe") commands.push_back(ControlCommand::observe);
+                    finished = true;
+                } else if (iterator->input.size() >= sizeof(buffer)) {
+                    finished = true;
+                }
+            } else if (count == 0 || (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)) {
+                finished = true;
+            }
         }
-
-        char buffer[32]{};
-        const ssize_t count = read(client, buffer, sizeof(buffer) - 1);
-        (void)::close(client);
-        if (count <= 0) {
-            continue;
-        }
-        const std::string command(buffer, static_cast<size_t>(count));
-        if (command.starts_with("connect")) {
-            commands.push_back(ControlCommand::connect);
-        } else if (command.starts_with("disconnect")) {
-            commands.push_back(ControlCommand::disconnect);
-        } else if (command.starts_with("observe")) {
-            commands.push_back(ControlCommand::observe);
-        }
+        if (finished) {
+            ::close(iterator->descriptor);
+            iterator = clients_.erase(iterator);
+        } else ++iterator;
     }
     return commands;
 }
@@ -118,7 +141,10 @@ void ControlServer::close() {
         (void)::close(socket_);
         socket_ = -1;
     }
-    (void)unlink(kControlPath);
+    for (const auto& client : clients_) (void)::close(client.descriptor);
+    clients_.clear();
+    if (ownsPath_) (void)unlink(path_.c_str());
+    ownsPath_ = false;
 }
 
 } // namespace horndis

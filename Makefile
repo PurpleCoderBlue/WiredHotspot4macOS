@@ -2,7 +2,7 @@ PREFIX ?= /usr/local
 DESTDIR ?=
 APPDIR ?= /Applications
 BUILD_DIR ?= build
-VERSION ?= 0.3.10
+VERSION ?= 0.1.0
 ARCH_FLAGS ?=
 STATUS_ARCHS ?= $(shell uname -m)
 
@@ -18,7 +18,7 @@ CODESIGN := codesign
 SOURCES := Sources/main.mm Sources/RNDISProtocol.cpp Sources/USBTransport.mm \
 	Sources/VirtualEthernet.cpp Sources/ServiceManager.cpp Sources/RuntimeStatus.cpp \
 	Sources/ControlServer.cpp Sources/Diagnostics.mm Sources/SupervisorChannel.cpp \
-	Sources/InterfaceSelection.cpp Sources/NetworkService.cpp
+	Sources/InterfaceSelection.cpp Sources/NetworkService.cpp Sources/USBDescriptors.cpp Sources/AgentSandbox.cpp
 OBJECTS := $(SOURCES:%=$(BUILD_DIR)/%.o)
 TARGET := $(BUILD_DIR)/horndis
 STATUS_TARGET := $(BUILD_DIR)/horndis-status
@@ -34,6 +34,7 @@ STATUS_APP_LOCALIZATIONS := $(foreach language,$(STATUS_LANGUAGES),\
 STATUS_ICON_GENERATOR := $(BUILD_DIR)/generate-horndis-icon
 STATUS_ICONSET := $(BUILD_DIR)/HoRNDISStatus.iconset
 STATUS_ICON := $(BUILD_DIR)/HoRNDISStatus.icns
+STATUS_SOURCES := StatusApp/HoRNDISStatus.swift StatusApp/Localization.swift
 STATUS_ARCH_TARGETS = $(addprefix $(BUILD_DIR)/horndis-status-,$(STATUS_ARCHS))
 TEST_TARGET := $(BUILD_DIR)/rndis-protocol-tests
 RUNTIME_STATUS_TEST := $(BUILD_DIR)/runtime-status-tests
@@ -50,7 +51,23 @@ APP_LANGUAGE_PROBE := $(BUILD_DIR)/app-language-probe
 MENU_UI_CONTRACT_TEST := $(BUILD_DIR)/menu-ui-contract-tests
 MANPAGE := Documentation/horndis.1
 
-.PHONY: all clean install test test-ui
+.PHONY: all clean install test test-ui test-usb-regressions test-security-regressions test-control-server test-network-service test-network-failures xcode-build xcode-test
+
+# The Xcode external-build targets reuse this Makefile. Keep their output and
+# Swift module cache separate from command-line builds and never install/run.
+XCODE_CONFIGURATION = $(if $(CONFIGURATION),$(CONFIGURATION),Debug)
+XCODE_ARCHS = $(if $(filter YES,$(ONLY_ACTIVE_ARCH)),$(if $(NATIVE_ARCH_ACTUAL),$(NATIVE_ARCH_ACTUAL),$(shell uname -m)),$(if $(ARCHS),$(ARCHS),arm64 x86_64))
+XCODE_EMPTY :=
+XCODE_SPACE := $(XCODE_EMPTY) $(XCODE_EMPTY)
+XCODE_BUILD_DIR = build/xcode/$(XCODE_CONFIGURATION)/$(subst $(XCODE_SPACE),-,$(strip $(XCODE_ARCHS)))
+XCODE_TEST_DIR = build/xcode/$(XCODE_CONFIGURATION)/tests-$(shell uname -m)
+
+xcode-build:
+	$(MAKE) all BUILD_DIR="$(XCODE_BUILD_DIR)" ARCH_FLAGS="$(foreach arch,$(XCODE_ARCHS),-arch $(arch))" STATUS_ARCHS="$(XCODE_ARCHS)" SWIFTC='xcrun swiftc -module-cache-path "$(abspath $(XCODE_BUILD_DIR))/ModuleCache.noindex"'
+
+xcode-test:
+	@test "$$(id -u)" -ne 0 || { echo "Run regression tests as a non-root user" >&2; exit 1; }
+	$(MAKE) test BUILD_DIR="$(XCODE_TEST_DIR)" SWIFTC='xcrun swiftc -module-cache-path "$(abspath $(XCODE_TEST_DIR))/ModuleCache.noindex"'
 
 all: $(TARGET) $(STATUS_TARGET)
 
@@ -65,12 +82,12 @@ $(BUILD_DIR)/%.o: %
 
 # All service objects share these small interfaces. Header changes must rebuild
 # callers too (notably VirtualEthernet's root/agent object layout).
-$(OBJECTS): $(wildcard Sources/*.hpp)
+$(OBJECTS): $(wildcard Sources/*.hpp) Makefile
 
-$(BUILD_DIR)/horndis-status-%: StatusApp/HoRNDISStatus.swift
+$(BUILD_DIR)/horndis-status-%: $(STATUS_SOURCES)
 	@mkdir -p "$(@D)"
 	$(SWIFTC) -parse-as-library -O -whole-module-optimization -target $*-apple-macosx11.0 \
-		-framework AppKit -framework Foundation $< -o $@
+		-framework AppKit -framework Foundation $(STATUS_SOURCES) -o $@
 
 $(STATUS_ICON_GENERATOR): StatusApp/GenerateAppIcon.swift
 	@mkdir -p $(@D)
@@ -135,9 +152,46 @@ $(DIAGNOSTICS_PRIVACY_CONTRACT_TEST): Tests/DiagnosticsPrivacyContractTests.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) $< -o $@
 
-$(DIAGNOSTICS_REDACTION_TEST): Tests/DiagnosticsRedactionTests.mm Sources/Diagnostics.mm Sources/USBTransport.mm Sources/RNDISProtocol.cpp Sources/Diagnostics.hpp
+$(DIAGNOSTICS_REDACTION_TEST): Tests/DiagnosticsRedactionTests.mm Sources/Diagnostics.mm Sources/USBTransport.mm Sources/RNDISProtocol.cpp Sources/USBDescriptors.cpp Sources/RuntimeStatus.cpp Sources/Diagnostics.hpp
 	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) Tests/DiagnosticsRedactionTests.mm Sources/Diagnostics.mm Sources/USBTransport.mm Sources/RNDISProtocol.cpp $(LDFLAGS) -o $@
+	$(CXX) $(CXXFLAGS) Tests/DiagnosticsRedactionTests.mm Sources/Diagnostics.mm Sources/USBTransport.mm Sources/RNDISProtocol.cpp Sources/USBDescriptors.cpp Sources/RuntimeStatus.cpp $(LDFLAGS) -o $@
+
+$(BUILD_DIR)/usb-descriptors-tests: Tests/USBDescriptorsTests.cpp Sources/USBDescriptors.cpp Sources/USBDescriptors.hpp
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) Tests/USBDescriptorsTests.cpp Sources/USBDescriptors.cpp -o $@
+
+$(BUILD_DIR)/usb-transport-tests: Tests/USBTransportTests.mm Sources/USBTransport.mm Sources/RNDISProtocol.cpp Sources/USBDescriptors.cpp $(wildcard Sources/*.hpp)
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) -fno-access-control Tests/USBTransportTests.mm Sources/RNDISProtocol.cpp Sources/USBDescriptors.cpp $(LDFLAGS) -o $@
+
+test: test-usb-regressions
+
+test-usb-regressions: $(BUILD_DIR)/usb-descriptors-tests $(BUILD_DIR)/usb-transport-tests
+	$(BUILD_DIR)/usb-descriptors-tests
+	$(BUILD_DIR)/usb-transport-tests
+
+$(BUILD_DIR)/runtime-files-tests: Tests/RuntimeFilesTests.cpp Sources/RuntimeStatus.cpp Sources/RuntimeStatus.hpp
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) Tests/RuntimeFilesTests.cpp Sources/RuntimeStatus.cpp -o $@
+
+$(BUILD_DIR)/agent-sandbox-tests: Tests/AgentSandboxTests.cpp Sources/AgentSandbox.cpp Sources/AgentSandbox.hpp
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) Tests/AgentSandboxTests.cpp Sources/AgentSandbox.cpp -o $@
+
+test: test-security-regressions
+
+test-security-regressions: $(BUILD_DIR)/runtime-files-tests $(BUILD_DIR)/agent-sandbox-tests
+	$(BUILD_DIR)/runtime-files-tests
+	$(BUILD_DIR)/agent-sandbox-tests
+
+$(BUILD_DIR)/control-server-tests: Tests/ControlServerTests.cpp Sources/ControlServer.cpp Sources/ControlServer.hpp
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) Tests/ControlServerTests.cpp Sources/ControlServer.cpp $(LDFLAGS) -o $@
+
+test: test-control-server
+
+test-control-server: $(BUILD_DIR)/control-server-tests
+	$(BUILD_DIR)/control-server-tests
 
 $(DEVICE_ALIASES_TEST): Tests/DeviceAliasesTests.cpp Sources/DeviceAliases.hpp
 	@mkdir -p $(@D)
@@ -151,10 +205,10 @@ $(SERVICE_INSTALLATION_CONTRACT_TEST): Tests/ServiceInstallationContractTests.cp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) $< -o $@
 
-$(APP_LANGUAGE_PROBE): Tests/AppLanguageProbe.swift
+$(APP_LANGUAGE_PROBE): Tests/AppLanguageProbe.swift StatusApp/Localization.swift
 	@mkdir -p $(@D)
 	$(SWIFTC) -parse-as-library -target $(shell uname -m)-apple-macosx11.0 \
-		-framework Foundation $< -o $@
+		-framework Foundation $^ -o $@
 
 $(MENU_UI_CONTRACT_TEST): Tests/MenuUIContractTests.swift
 	@mkdir -p $(@D)
@@ -187,6 +241,20 @@ $(BUILD_DIR)/network-service-tests: Tests/NetworkServiceTests.cpp Sources/Networ
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
 
 test: test-network-service
+
+$(BUILD_DIR)/network-lifecycle-tests: Tests/NetworkLifecycleTests.cpp Sources/VirtualEthernet.cpp Sources/InterfaceSelection.cpp $(wildcard Sources/*.hpp)
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) -fno-access-control Tests/NetworkLifecycleTests.cpp Sources/InterfaceSelection.cpp $(LDFLAGS) -o $@
+
+$(BUILD_DIR)/network-preferences-tests: Tests/NetworkPreferencesTests.cpp Sources/NetworkService.cpp $(wildcard Sources/*.hpp)
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) Tests/NetworkPreferencesTests.cpp $(LDFLAGS) -o $@
+
+test: test-network-failures
+
+test-network-failures: $(BUILD_DIR)/network-lifecycle-tests $(BUILD_DIR)/network-preferences-tests
+	$(BUILD_DIR)/network-lifecycle-tests
+	$(BUILD_DIR)/network-preferences-tests
 
 test-network-service: $(BUILD_DIR)/network-service-tests
 	$(BUILD_DIR)/network-service-tests

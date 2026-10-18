@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: xcode-27
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
       - name: Build and test universal binary
@@ -29,24 +29,31 @@ jobs:
       - name: Package
         run: |
           mkdir -p dist/horndis
-          cp build/horndis README.md README.zh-CN.md LICENSE dist/horndis/
+          cp build/horndis README.md README.zh-CN.md README.en.md LICENSE dist/horndis/
           cp -R -X build/HoRNDISStatus.app dist/horndis/
           cp -R Documentation dist/horndis/
           cp -R docs dist/horndis/
-          ditto -c -k --keepParent dist/horndis "dist/horndis-${GITHUB_REF_NAME}-macos-universal.zip"
+          ditto -c -k --keepParent dist/horndis "dist/WiredHotspot4macOS-${GITHUB_REF_NAME}-macos-universal.zip"
 
           Scripts/build-package "${GITHUB_REF_NAME#v}" \
-            "dist/HoRNDIS-Userspace-${GITHUB_REF_NAME}-macos-universal.pkg"
+            "dist/WiredHotspot4macOS-${GITHUB_REF_NAME}-macos-universal.pkg"
           ! pkgutil --payload-files \
-            "dist/HoRNDIS-Userspace-${GITHUB_REF_NAME}-macos-universal.pkg" \
+            "dist/WiredHotspot4macOS-${GITHUB_REF_NAME}-macos-universal.pkg" \
             | grep -Eq '(^|/)\._'
 
+          python3 Tests/PackageContentsTests.py "dist/WiredHotspot4macOS-${GITHUB_REF_NAME}-macos-universal.pkg"
           (
             cd dist
-            shasum -a 256 "horndis-${GITHUB_REF_NAME}-macos-universal.zip" > "horndis-${GITHUB_REF_NAME}-macos-universal.zip.sha256"
-            shasum -a 256 "HoRNDIS-Userspace-${GITHUB_REF_NAME}-macos-universal.pkg" > "HoRNDIS-Userspace-${GITHUB_REF_NAME}-macos-universal.pkg.sha256"
+            shasum -a 256 *.pkg *.zip > SHA256SUMS
           )
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/*.pkg dist/*.zip dist/*.sha256 --generate-notes
+        run: |
+          # A maintainer may have already uploaded a locally verified build.
+          # Preserve that release and its checksums rather than replacing assets.
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release already exists; preserving its uploaded assets."
+          else
+            gh release create "$GITHUB_REF_NAME" dist/*.pkg dist/*.zip dist/SHA256SUMS --generate-notes
+          fi

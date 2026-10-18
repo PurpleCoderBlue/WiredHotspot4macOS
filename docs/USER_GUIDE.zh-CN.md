@@ -17,7 +17,7 @@ brew install --cask noahhhi/tap/horndis
 
 或直接安装 PKG：
 
-1. 从 [GitHub Releases](https://github.com/noahhhi/HoRNDIS-Userspace/releases) 下载通用 `.pkg` 安装包。
+1. 从 [GitHub Releases](https://github.com/PurpleCoderBlue/WiredHotspot4macOS/releases) 下载通用 `.pkg` 安装包。
 2. 先尝试打开下载的 `.pkg`。
 3. 如果 macOS 阻止打开，进入“**系统设置 → 隐私与安全性**”。
 4. 找到 HoRNDIS 安装包的提示，点击“**仍要打开**”。
@@ -33,7 +33,7 @@ brew install --cask noahhhi/tap/horndis
 
 ## 菜单栏
 
-App 使用 macOS 标准 Bundle 本地化，并跟随系统语言或 App 单独语言设置。内置英语、简体中文、繁体中文、日语、韩语、法语、德语、西班牙语、巴西葡萄牙语、意大利语和俄语。可前往“**系统设置 → 通用 → 语言与地区 → 应用程序**”为 HoRNDIS 状态栏选择语言，然后重新打开 App。
+App 默认使用简体中文；macOS 中显式设置的 App 单独语言优先，不修改系统语言。内置英语、简体中文、繁体中文、日语、韩语、法语、德语、西班牙语、巴西葡萄牙语、意大利语和俄语。可前往“**系统设置 → 通用 → 语言与地区 → 应用程序**”为有线热点4macOS选择语言，然后重新打开 App。
 
 菜单默认保持精简，并使用 Apple SF Symbols 显示：
 

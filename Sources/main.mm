@@ -10,6 +10,7 @@
 #include "DeviceAliases.hpp"
 #include "Diagnostics.hpp"
 #include "SupervisorChannel.hpp"
+#include "AgentSandbox.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -24,6 +25,7 @@
 #include <iomanip>
 #include <iostream>
 #include <limits.h>
+#include <limits>
 #include <mach-o/dyld.h>
 #include <mutex>
 #include <optional>
@@ -272,7 +274,8 @@ int printStatus() {
                                                                                   : "not installed"))
               << '\n';
 
-    NSData* data = [NSData dataWithContentsOfFile:@"/var/run/horndis/status.json"];
+    const auto snapshot = horndis::readLatestRuntimeStatus();
+    NSData* data = snapshot.empty() ? nil : [NSData dataWithBytes:snapshot.data() length:snapshot.size()];
     if (data != nil) {
         NSDictionary* json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
         NSString* state = [json isKindOfClass:[NSDictionary class]] ? json[@"state"] : nil;
@@ -309,7 +312,7 @@ int probe() {
                   << horndis::protocolName(device.protocol) << " "
                   << hexadecimal(device.vendorId, 4) << ":" << hexadecimal(device.productId, 4)
                   << " interfaces=" << static_cast<unsigned>(device.controlInterfaceNumber) << "/"
-                  << static_cast<unsigned>(device.dataInterfaceNumber);
+                  << (device.dataInterfaceKnown ? std::to_string(device.dataInterfaceNumber) : "?");
         std::cout << (device.supported ? " [supported]" : " [detected; backend pending]") << '\n';
     }
     return 0;
@@ -372,6 +375,10 @@ int runAgent(int bpfDescriptor,
              const std::string& hostInterface,
              const std::string& transportInterface,
              int supervisorDescriptor) {
+    if (geteuid() == 0) {
+        logLine("the USB data agent must not execute as root");
+        return 1;
+    }
     std::signal(SIGINT, handleSignal);
     std::signal(SIGTERM, handleSignal);
     horndis::VirtualEthernet ethernet;
@@ -521,13 +528,9 @@ int runAgent(int bpfDescriptor,
                 runtimeStatus.detail = error;
                 publishStatus(statusPublisher, runtimeStatus);
                 usb.close();
-                std::this_thread::sleep_for(std::chrono::seconds(2));
-                runtimeStatus.state = "waiting";
-                runtimeStatus.device.clear();
-                runtimeStatus.deviceAlias.clear();
-                runtimeStatus.detail = "Waiting for Android USB tethering";
-                publishStatus(statusPublisher, runtimeStatus);
-                continue;
+                // The supervisor rolls back partial activation. A failed
+                // operation revokes this channel, so restart via root cleanup.
+                return 1;
             }
 
             logLine("connected device " + std::to_string(deviceNumber) + " to " + hostInterface);
@@ -636,6 +639,8 @@ int runAgent(int bpfDescriptor,
                         std::string repairError;
                         if (!horndis::requestDHCPRefresh(supervisorDescriptor, repairError)) {
                             logLine(repairError);
+                            sessionRunning.store(false);
+                            break;
                         }
                         lastDhcpRepair = now;
                     }
@@ -643,11 +648,12 @@ int runAgent(int bpfDescriptor,
             }
 
             sessionRunning.store(false);
-            outbound.join();
+            usb.cancelWrites();
+            // Revoke the owned network before waiting for outbound teardown.
             std::string suspendError;
-            if (!horndis::requestNetworkSuspend(supervisorDescriptor, suspendError)) {
-                logLine(suspendError);
-            }
+            const bool suspended = horndis::requestNetworkSuspend(supervisorDescriptor, suspendError);
+            outbound.join();
+            if (!suspended) logLine(suspendError);
             {
                 std::lock_guard lock(outboundErrorMutex);
                 if (!outboundError.empty()) {
@@ -655,6 +661,12 @@ int runAgent(int bpfDescriptor,
                 }
             }
             usb.close();
+            if (!suspended) {
+                runtimeStatus.state = "error";
+                runtimeStatus.detail = "Network cleanup failed: " + suspendError;
+                publishStatus(statusPublisher, runtimeStatus);
+                return 1;
+            }
             if (gRunning.load()) {
                 logLine(userPaused ? "connection paused from the menu bar"
                                    : "device disconnected; waiting to reconnect");
@@ -726,18 +738,8 @@ std::string executablePath(std::string& error) {
 }
 
 bool prepareRuntimeDirectory(const ConsoleUser& identity, std::string& error) {
-    constexpr const char* directory = "/var/run/horndis";
-    if (mkdir(directory, 0755) != 0 && errno != EEXIST) {
-        error = "cannot create runtime directory: " + std::string(std::strerror(errno));
-        return false;
-    }
-    (void)unlink("/var/run/horndis/control.sock");
-    if (chown(directory, identity.user, identity.group) != 0 || chmod(directory, 0700) != 0) {
-        error = "cannot assign the runtime directory to the console user: " +
-                std::string(std::strerror(errno));
-        return false;
-    }
-    return true;
+    return horndis::prepareUserRuntimeDirectory("/var/run/horndis", identity.user,
+                                               identity.group, error);
 }
 
 pid_t spawnAgent(const std::string& executable,
@@ -786,22 +788,16 @@ pid_t spawnAgent(const std::string& executable,
 
     const std::string descriptor = std::to_string(bpfDescriptor);
     const std::string supervisor = std::to_string(channel[1]);
+    const std::string user = std::to_string(identity.user);
+    const std::string group = std::to_string(identity.group);
     const pid_t child = fork();
     if (child == 0) {
         (void)close(channel[0]);
-        const gid_t group = identity.group;
-        if (setgroups(1, &group) != 0 || setgid(identity.group) != 0 ||
-            setuid(identity.user) != 0) {
-            _exit(126);
-        }
-        execl(executable.c_str(),
-              executable.c_str(),
-              "agent",
-              descriptor.c_str(),
-              hostInterface.c_str(),
-              transportInterface.c_str(),
-              supervisor.c_str(),
-              static_cast<char*>(nullptr));
+        // Only async-signal-safe operations after fork. A fresh process
+        // applies the sandbox before permanently dropping its root identity.
+        execl(executable.c_str(), executable.c_str(), "agent-bootstrap",
+              descriptor.c_str(), hostInterface.c_str(), transportInterface.c_str(),
+              supervisor.c_str(), user.c_str(), group.c_str(), static_cast<char*>(nullptr));
         _exit(127);
     }
     const int savedError = errno;
@@ -817,11 +813,51 @@ pid_t spawnAgent(const std::string& executable,
     return child;
 }
 
-void superviseAgentDHCP(int descriptor, horndis::VirtualEthernet& ethernet) {
+int bootstrapAgent(const char* executable, int bpfDescriptor, const char* host,
+                   const char* transport, int supervisorDescriptor, uid_t user, gid_t group) {
+    if (geteuid() != 0 || user == 0) {
+        logLine("the data agent bootstrap requires the root supervisor");
+        return 1;
+    }
+    const auto current = currentConsoleUser();
+    if (!current || current->user != user || current->group != group) {
+        logLine("console session changed before data agent startup");
+        return 1;
+    }
+    std::string error;
+    if (!horndis::restrictDescriptorIOCTL(bpfDescriptor, error)) {
+        logLine(error);
+        return 125;
+    }
+    if (setgroups(1, &group) != 0 || setgid(group) != 0 || setuid(user) != 0) {
+        logLine("cannot permanently drop data agent privileges");
+        return 126;
+    }
+    const auto descriptor = std::to_string(bpfDescriptor);
+    const auto supervisor = std::to_string(supervisorDescriptor);
+    execl(executable, executable, "agent", descriptor.c_str(), host, transport,
+          supervisor.c_str(), static_cast<char*>(nullptr));
+    return 127;
+}
+
+bool superviseAgentDHCP(int descriptor, horndis::VirtualEthernet& ethernet,
+                         const ConsoleUser& identity) {
     while (gRunning.load()) {
+        std::string error;
+        const auto activity = horndis::waitSupervisorActivity(descriptor, [&] {
+            const auto current = currentConsoleUser();
+            return current && current->user == identity.user && current->group == identity.group;
+        }, [] { return gRunning.load(); }, error);
+        if (activity == horndis::SupervisorActivity::sessionEnded) {
+            logLine("console session changed; revoking the old data agent");
+            return true;
+        }
+        if (activity != horndis::SupervisorActivity::requestReady) {
+            if (!error.empty()) logLine(error);
+            break;
+        }
         horndis::SupervisorRequest request{};
         bool closed = false;
-        std::string error;
         if (!horndis::receiveSupervisorRequest(descriptor, request, closed, error)) {
             logLine(error);
             break;
@@ -852,19 +888,24 @@ void superviseAgentDHCP(int descriptor, horndis::VirtualEthernet& ethernet) {
             logLine(responseError);
             break;
         }
+        // A failed network operation cannot leave this agent starting a new
+        // session on partially configured interfaces.
+        if (!success) break;
     }
+    return false;
 }
 
-// Root-published snapshots stay mode 0600, so hand them to the console user;
-// otherwise the menu bar app cannot read supervisor states such as "starting",
-// "waiting", or an agent-restart error.
+// Root snapshots live in a separate root-owned directory. Ownership is set on
+// the open temporary inode, never by following a name in the user's directory.
 void publishSupervisorStatus(horndis::RuntimeStatusPublisher& publisher,
                              const horndis::RuntimeStatus& status,
                              bool force = false) {
-    publishStatus(publisher, status, force);
     const auto identity = currentConsoleUser();
-    if (identity.has_value()) {
-        (void)chown("/var/run/horndis/status.json", identity->user, identity->group);
+    std::optional<std::pair<uid_t, gid_t>> owner;
+    if (identity) owner = {{identity->user, identity->group}};
+    std::string error;
+    if (!publisher.publish(status, error, force, owner)) {
+        logLine(error);
     }
 }
 
@@ -886,7 +927,8 @@ int runBridge() {
     std::signal(SIGINT, handleSignal);
     std::signal(SIGTERM, handleSignal);
     horndis::RuntimeStatus supervisorStatus;
-    horndis::RuntimeStatusPublisher statusPublisher;
+    horndis::RuntimeStatusPublisher statusPublisher(std::chrono::seconds(5),
+                                                   "/var/run/horndis-supervisor");
     supervisorStatus.state = "starting";
     supervisorStatus.hostInterface = requestedHost;
     supervisorStatus.detail = "Preparing the privileged network capability";
@@ -901,8 +943,8 @@ int runBridge() {
         publishSupervisorStatus(statusPublisher, supervisorStatus);
         return 1;
     }
-    const std::string hostInterface = ethernet.hostInterface();
-    const std::string transportInterface = ethernet.transportInterface();
+    std::string hostInterface = ethernet.hostInterface();
+    std::string transportInterface = ethernet.transportInterface();
     supervisorStatus.hostInterface = hostInterface;
     supervisorStatus.detail = "Privileged network capability is ready";
     publishSupervisorStatus(statusPublisher, supervisorStatus, true);
@@ -944,25 +986,42 @@ int runBridge() {
         logLine("started unprivileged data agent for user (pid " +
                 std::to_string(agent) + ")");
 
-        superviseAgentDHCP(supervisorDescriptor, ethernet);
+        const bool sessionChanged = superviseAgentDHCP(supervisorDescriptor, ethernet, identity.value());
         std::string suspendError;
-        if (!ethernet.suspendNetwork(suspendError)) logLine(suspendError);
+        const bool suspended = ethernet.suspendNetwork(suspendError);
+        if (!suspended) logLine(suspendError);
         (void)close(supervisorDescriptor);
 
         int childStatus = 0;
-        if (!gRunning.load()) {
-            (void)kill(agent, SIGTERM);
-        }
-        pid_t waitResult = -1;
-        do {
-            waitResult = waitpid(agent, &childStatus, 0);
-        } while (waitResult < 0 && errno == EINTR);
         gAgentPid = -1;
-        if (waitResult < 0) {
-            logLine("cannot wait for the data agent: " + std::string(std::strerror(errno)));
+        std::string stopError;
+        if (!horndis::stopDataAgent(agent, childStatus, stopError)) {
+            logLine(stopError);
+            return 1;
+        }
+        if (!suspended) {
+            supervisorStatus.state = "error";
+            supervisorStatus.detail = "Network cleanup failed: " + suspendError;
+            publishSupervisorStatus(statusPublisher, supervisorStatus, true);
+            return 1;
         }
         if (!gRunning.load()) {
             break;
+        }
+        if (sessionChanged) {
+            // Killing the agent alone cannot revoke an fd copied to a child.
+            // Destroy the old feth endpoint; the sandbox prevents rebinding any
+            // surviving descriptor to the new session's freshly created pair.
+            ethernet.close();
+            if (!ethernet.open(requestedHost, requestedTransport, error)) {
+                logLine(error);
+                supervisorStatus.state = "error"; supervisorStatus.detail = error;
+                publishSupervisorStatus(statusPublisher, supervisorStatus, true);
+                return 1;
+            }
+            hostInterface = ethernet.hostInterface();
+            transportInterface = ethernet.transportInterface();
+            supervisorStatus.hostInterface = hostInterface;
         }
         const int exitStatus = WIFEXITED(childStatus) ? WEXITSTATUS(childStatus) : -1;
         logLine("unprivileged data agent exited with status " + std::to_string(exitStatus) +
@@ -1003,7 +1062,8 @@ int manageService(const std::string& action) {
 
 int main(int argc, char* argv[]) {
     @autoreleasepool {
-        if (argc == 6 && std::string(argv[1]) == "agent") {
+        if ((argc == 6 && std::string(argv[1]) == "agent") ||
+            (argc == 8 && std::string(argv[1]) == "agent-bootstrap")) {
             char* end = nullptr;
             errno = 0;
             const long descriptor = std::strtol(argv[2], &end, 10);
@@ -1020,6 +1080,21 @@ int main(int argc, char* argv[]) {
                 supervisorDescriptor == descriptor) {
                 std::cerr << "invalid inherited supervisor descriptor\n";
                 return 64;
+            }
+            if (argc == 8) {
+                auto parseID = [](const char* value, unsigned long& result) {
+                    char* end = nullptr; errno = 0;
+                    result = std::strtoul(value, &end, 10);
+                    return value[0] != '-' && errno == 0 && end != value && *end == '\0';
+                };
+                unsigned long user = 0, group = 0;
+                if (!parseID(argv[6], user) || !parseID(argv[7], group) || user == 0 ||
+                    user > std::numeric_limits<uid_t>::max() || group > std::numeric_limits<gid_t>::max()) {
+                    std::cerr << "invalid data agent identity\n";
+                    return 64;
+                }
+                return bootstrapAgent(argv[0], static_cast<int>(descriptor), argv[3], argv[4],
+                    static_cast<int>(supervisorDescriptor), static_cast<uid_t>(user), static_cast<gid_t>(group));
             }
             return runAgent(static_cast<int>(descriptor),
                             argv[3],

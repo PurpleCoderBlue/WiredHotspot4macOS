@@ -12,6 +12,24 @@ private enum AppLanguageProbe {
         let expectedLocalizations = [
             "en", "zh-Hans", "zh-Hant", "ja", "ko", "fr", "de", "es", "pt-BR", "it", "ru",
         ]
+        precondition(bundle.developmentLocalization == "zh-Hans", "Development language must be Chinese")
+        for (preferences, language) in [
+            (nil, "zh-Hans"), ([], "zh-Hans"), (["xx"], "zh-Hans"),
+            (["en"], "en"), (["en-GB"], "en"), (["zh-Hant"], "zh-Hant"), (["ja"], "ja"),
+        ] as [([String]?, String)] {
+            let selected = StatusLocalization.bundle(for: bundle, applicationLanguages: preferences)
+            guard let expectedPath = bundle.path(forResource: language, ofType: "lproj"),
+                  let expected = Bundle(path: expectedPath) else { fatalError("Missing language bundle") }
+            let expectedName = language == "zh-Hans" ? "有线热点4macOS"
+                : language == "zh-Hant" ? "有線熱點4macOS" : "Wired Hotspot 4 macOS"
+            precondition(selected.localizedString(forKey: "CFBundleDisplayName", value: "MISSING", table: "InfoPlist") == expectedName,
+                         "Localized product name has stale branding or incorrect macOS capitalization")
+            let key = "menu.quit"
+            precondition(selected.localizedString(forKey: key, value: "MISSING", table: "Localizable") ==
+                         expected.localizedString(forKey: key, value: "MISSING", table: "Localizable"),
+                         "Default language or explicit app language was ignored")
+        }
+        print("Chinese default and explicit per-app language overrides passed")
         let referenceKeys = localizationKeys(in: bundle, localization: "en")
 
         print("localizations=\(bundle.localizations)")

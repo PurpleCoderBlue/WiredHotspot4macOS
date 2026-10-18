@@ -15,7 +15,7 @@
 "menu.usbTethering" = "USB テザリング";
 "menu.launchAtLogin" = "ログイン時に起動";
 "menu.details" = "詳細";
-"menu.quit" = "HoRNDIS Status を終了";
+"menu.quit" = "Wired Hotspot 4 macOS を終了";
 "menu.saveDiagnosticReport" = "診断レポートを保存…";
 "menu.openServiceLog" = "サービスログを開く";
 "menu.reportBug" = "問題を報告…";
@@ -25,16 +25,16 @@
 "summary.configuring" = "設定中…";
 "summary.interface" = "インターフェイス";
 
-"diagnostics.savePanelTitle" = "HoRNDIS 診断レポートを保存";
+"diagnostics.savePanelTitle" = "Wired Hotspot 4 macOS 診断レポートを保存";
 "diagnostics.failedTitle" = "診断レポートの作成に失敗しました";
 
-"error.bundledToolMissingOrUnsafe" = "同梱の HoRNDIS ネットワークツールが見つからないか、安全ではありません";
+"error.bundledToolMissingOrUnsafe" = "同梱の Wired Hotspot 4 macOS ネットワークツールが見つからないか、安全ではありません";
 "error.cannotPrepareAuthorization" = "管理者認証の要求を準備できません";
 "error.authorizationCancelled" = "管理者認証がキャンセルされました";
 "error.authorizationFailed" = "管理者認証に失敗しました";
-"error.cannotContactService" = "HoRNDIS サービスに接続できません";
+"error.cannotContactService" = "Wired Hotspot 4 macOS サービスに接続できません";
 "error.cannotSendConnectionRequest" = "接続要求を送信できません";
-"error.bundledToolMissing" = "同梱の HoRNDIS ネットワークツールが見つかりません";
+"error.bundledToolMissing" = "同梱の Wired Hotspot 4 macOS ネットワークツールが見つかりません";
 "error.cannotCreateDiagnosticReport" = "診断レポートを作成できませんでした";
 "error.installationNotVerified" = "特権サービスが正しくインストールされたことを確認できません";
 "error.launchctlExited" = "launchctl はステータス %d で終了しました";

@@ -15,7 +15,7 @@
 "menu.usbTethering" = "USB 网络共享";
 "menu.launchAtLogin" = "登录时启动";
 "menu.details" = "详细信息";
-"menu.quit" = "退出 HoRNDIS 状态栏";
+"menu.quit" = "退出 有线热点4macOS";
 "menu.saveDiagnosticReport" = "保存诊断报告…";
 "menu.openServiceLog" = "打开服务日志";
 "menu.reportBug" = "报告问题…";
@@ -25,16 +25,16 @@
 "summary.configuring" = "配置中…";
 "summary.interface" = "接口";
 
-"diagnostics.savePanelTitle" = "保存 HoRNDIS 诊断报告";
+"diagnostics.savePanelTitle" = "保存 有线热点4macOS 诊断报告";
 "diagnostics.failedTitle" = "诊断报告创建失败";
 
-"error.bundledToolMissingOrUnsafe" = "内置的 HoRNDIS 网络工具缺失或权限不安全";
+"error.bundledToolMissingOrUnsafe" = "内置的 有线热点4macOS 网络工具缺失或权限不安全";
 "error.cannotPrepareAuthorization" = "无法准备管理员授权请求";
 "error.authorizationCancelled" = "管理员授权已取消";
 "error.authorizationFailed" = "管理员授权失败";
-"error.cannotContactService" = "无法连接 HoRNDIS 服务";
+"error.cannotContactService" = "无法连接 有线热点4macOS 服务";
 "error.cannotSendConnectionRequest" = "无法发送连接请求";
-"error.bundledToolMissing" = "内置的 HoRNDIS 网络工具缺失";
+"error.bundledToolMissing" = "内置的 有线热点4macOS 网络工具缺失";
 "error.cannotCreateDiagnosticReport" = "无法创建诊断报告";
 "error.installationNotVerified" = "无法验证特权服务是否已正确安装";
 "error.launchctlExited" = "launchctl 已退出，状态码为 %d";
