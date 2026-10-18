@@ -18,6 +18,15 @@ The package includes Apple Silicon and Intel binaries. The command remains `horn
 
 The installer has no Developer ID signature or notarization; its binaries are ad-hoc signed. If macOS blocks opening it, verify its origin and use **System Settings → Privacy & Security → Open Anyway**. SIP and boot security do not need to be reduced.
 
+The same release PKG is available through the [project's Homebrew Tap](https://github.com/PurpleCoderBlue/homebrew-tap):
+
+```sh
+brew tap PurpleCoderBlue/tap
+brew install --cask purplecoderblue/tap/wiredhotspot4macos
+```
+
+This is a maintainer-provided third-party tap, not an official Homebrew repository. Installation requires administrator authentication, and the PKG has the same signing status as the direct download. Do not manage the same installation through multiple distribution channels.
+
 ## Use and language
 
 The menu controls pause/resume, login startup, connection details, traffic totals and diagnostic export. Quitting the menu app does not stop the network service. Install, upgrade and uninstall require administrator authentication; normal menu operations do not.

@@ -21,7 +21,14 @@
 
 > 安装包未使用 Developer ID 签名或公证，内置程序使用本地 ad-hoc 签名。如果 macOS 阻止打开，请确认下载来源后，在“系统设置 → 隐私与安全性”中使用“仍要打开”。无需关闭 SIP 或降低启动安全性。
 
-上游 Homebrew tap 安装的是上游版本；要使用本分支的修复，请下载本仓库的安装包。
+也可以通过[本项目自建的 Homebrew Tap](https://github.com/PurpleCoderBlue/homebrew-tap)安装同一份正式版 PKG：
+
+```sh
+brew tap PurpleCoderBlue/tap
+brew install --cask purplecoderblue/tap/wiredhotspot4macos
+```
+
+这是项目维护者提供的第三方 Tap，不属于 Homebrew 官方仓库；安装仍需管理员认证，签名状态与直接下载的 PKG 相同。上游 Tap 安装的是上游版本，请勿同时管理同一份安装。
 
 ## 使用与语言
 
